@@ -9,7 +9,7 @@ Nothing in this script runs until the [roadmap](roadmap.md) builds it. When a st
 ## Before play
 
 1. **Master.** A pipeline command writes the mezzanine and a WebVTT file. Open the master directory and confirm there is no playlist (TR-1.1).
-2. **Package.** `./pipeline/hls.sh` writes one CMAF ladder and the HLS menu. The DASH menu is written from those same files by the next story. Both menus must list two video rungs, audio, and captions for the same duration (TR-2.1 to TR-2.4).
+2. **Package.** `./pipeline/hls.sh` writes one CMAF ladder and the HLS menu. `./pipeline/dash.sh` writes the DASH menu from those same files. Both menus list two video rungs, audio, and captions for the same duration (TR-2.1 to TR-2.4).
 3. **Encrypt.** A protected copy of those segments exists. A player that loads the protected menu with no license service stays black (TR-3.1, TR-7.3).
 4. **Origin.** Origin A on port 8080 and origin B on port 8081 both serve that tree (TR-4.4).
 
