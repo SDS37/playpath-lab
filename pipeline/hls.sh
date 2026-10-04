@@ -46,7 +46,8 @@ keyint="$((idr_interval * frame_rate))"
 # Two video rungs and one AAC-LC rendition. The ~2000 kbit/s rung is first
 # (HLS authoring specification, item 1.32). IDR every idr_interval seconds,
 # and a segment cut every segment_duration seconds so each segment starts
-# on an IDR (items 1.13, 7.4, 7.5, 7.6).
+# on an IDR (items 1.13, 7.4, 7.5, 7.6). movflags=+cmaf asks the MP4 muxer
+# for CMAF fragments. https://ffmpeg.org/ffmpeg-formats.html#mov_002c-mp4_002c-ismv
 ffmpeg -y -hide_banner \
   -i "${video}" \
   -filter_complex "[0:v]split=2[v1080][v720];[v720]scale=1280:720:flags=bicubic[v720s]" \
@@ -63,6 +64,7 @@ ffmpeg -y -hide_banner \
   -hls_time "${segment_duration}" \
   -hls_playlist_type vod \
   -hls_segment_type fmp4 \
+  -hls_segment_options movflags=+cmaf \
   -hls_flags independent_segments \
   -hls_fmp4_init_filename init.mp4 \
   -hls_segment_filename "${out}/%v/seg_%d.m4s" \
@@ -151,7 +153,8 @@ EOF
   echo "#EXT-X-VERSION:7"
   echo "#EXT-X-INDEPENDENT-SEGMENTS"
   echo '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="English",DEFAULT=YES,AUTOSELECT=YES,LANGUAGE="en",CHANNELS="2",URI="audio/media.m3u8"'
-  echo '#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="English",DEFAULT=YES,AUTOSELECT=YES,LANGUAGE="en",CHARACTERISTICS="public.accessibility.transcribes-spoken-dialog,public.accessibility.describes-music-and-sound",URI="subtitles/media.m3u8"'
+  # A WEBVTT header does not prove the cues transcribe speech or describe sound.
+  echo '#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="English",DEFAULT=YES,AUTOSELECT=YES,LANGUAGE="en",URI="subtitles/media.m3u8"'
   while IFS= read -r line; do
     if [[ "${line}" == \#EXT-X-STREAM-INF:* ]]; then
       [[ "${line}" =~ RESOLUTION=([^,]+) ]] || { echo "Missing RESOLUTION in ${line}" >&2; exit 1; }
@@ -207,6 +210,7 @@ check_media() {
   map_uri="$(sed -n 's/.*EXT-X-MAP:URI="\([^"]*\)".*/\1/p' "${playlist}")"
   [[ -n "${map_uri}" && -f "$(dirname "${playlist}")/${map_uri}" ]] || fail "${kind} init segment is missing."
   grep -a -q ftyp "$(dirname "${playlist}")/${map_uri}" || fail "${kind} init segment is not fMP4."
+  grep -a -q cmfc "$(dirname "${playlist}")/${map_uri}" || fail "${kind} init segment is not CMAF (missing cmfc)."
   local seg count=0
   while IFS= read -r seg; do
     [[ -f "$(dirname "${playlist}")/${seg}" ]] || fail "${kind} segment ${seg} is missing."
