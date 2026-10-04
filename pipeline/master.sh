@@ -31,12 +31,18 @@ if [[ -n "${caption_src}" ]]; then
     echo "Caption file not found: ${caption_src}" >&2
     exit 1
   fi
+  # WebVTT header: optional UTF-8 BOM, then WEBVTT, then end of line or a
+  # space/tab and more header text. https://www.w3.org/TR/webvtt1/#file-structure
   first="$(head -n 1 "${caption_src}")"
-  if [[ "${first}" != "WEBVTT" && "${first}" != $'WEBVTT\r' ]]; then
-    echo "Caption file must start with WEBVTT." >&2
+  first="${first#$'\xef\xbb\xbf'}"
+  first="${first%$'\r'}"
+  if [[ ! "${first}" =~ ^WEBVTT($|[[:blank:]].*)$ ]]; then
+    echo "Caption file must be WebVTT (a WEBVTT header)." >&2
     exit 1
   fi
-  cp "${caption_src}" "${captions}"
+  if [[ ! "${caption_src}" -ef "${captions}" ]]; then
+    cp "${caption_src}" "${captions}"
+  fi
 else
   cat >"${captions}" <<'EOF'
 WEBVTT
