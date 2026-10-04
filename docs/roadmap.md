@@ -2,7 +2,7 @@
 
 The PoC is built in the order the film is built. Later milestones may start once their input exists. A milestone is done when its [technical requirements](technical-requirements.md) have an observation, not when the code compiles.
 
-**Today:** M0 is done. `./pipeline/master.sh` writes the mezzanine. `./pipeline/hls.sh` and `./pipeline/dash.sh` write the CMAF ladder and both menus. The services and the apps are not built.
+**Today:** M0 is done. `./pipeline/master.sh` writes the mezzanine. `./pipeline/hls.sh` and `./pipeline/dash.sh` write the CMAF ladder and both menus. `./pipeline/timelines.sh` fails if those menus diverge. The services and the apps are not built.
 
 | Milestone | Status | Phase | Goal | Requirements | Checkpoint |
 |---|---|---|---|---|---|

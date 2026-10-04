@@ -293,4 +293,6 @@ if ((${#playlists[@]} > 0)); then
   exit 1
 fi
 
+"${root}/pipeline/timelines.sh"
+
 echo "Title id: ${title}"
