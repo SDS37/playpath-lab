@@ -1,0 +1,341 @@
+# Architecture
+
+PlayPath is a lab for one streaming path. The title is prepared before any app runs. Each device then plays it with the engine that platform already has.
+
+This document describes the **target** the PoC will run. Nothing in the tree below is implemented yet. Week-by-week order is the [roadmap](roadmap.md). Choices are the [ADRs](architecture-decision-records.md). The proof for each box is a row in the [technical requirements](technical-requirements.md).
+
+**How to read the diagrams.** Solid arrows are the happy path. The license step fails closed: no key, no picture. The ad stitcher fails open: no personalised menu, play the clean film.
+
+## The ten phases
+
+Phases 1 to 5 happen before a viewer exists. Phases 6 to 10 are the device.
+
+| Phase | Name | Technology | Written in | Breaks when |
+|---|---|---|---|---|
+| 1 | Master | Mezzanine file | Media workflow | The source is wrong or missing |
+| 2 | Package | HLS and DASH, one CMAF ladder | C++ packager, driven by a script or Go | A ladder or a menu is invalid |
+| 3 | Encrypt | MPEG-CENC, Clear Key in the lab; FairPlay, Widevine, PlayReady in production | C++ packager, Go license service | The license service is down |
+| 4 | CDN | HTTP segments, two local origins | Go | The segment host fails |
+| 5 | Ads | SSAI and CSAI (VAST) | Go, then the app | A cue seeks to the wrong second |
+| 6 | App | Compose, UIKit, React, engines | Kotlin, Swift, TypeScript | The wrong engine is used |
+| 7 | License | EME or a native key session | Engine plus the platform CDM | The key never arrives |
+| 8 | Playback | Buffer, ABR, decode | Engine plus platform decoders | The network drops and ABR does not |
+| 9 | UI | Controls and theme | Kotlin, Swift, CSS, React Native styles | A control does not match player state |
+| 10 | Monitor | Startup, stall, bitrate, ads, DRM | JSON from each app | One platform is invisible |
+
+```mermaid
+flowchart LR
+  master["1 Master"] --> package["2 Package"]
+  package --> encrypt["3 Encrypt"]
+  encrypt --> origin["4 Origin"]
+  origin --> ads["5 Ads"]
+  ads --> app["6 App"]
+  app --> license["7 License"]
+  license --> playback["8 Buffer ABR Decode"]
+  playback --> ui["9 Controls"]
+  playback --> monitor["10 Monitor"]
+  ui --> monitor
+```
+
+## 1. System context
+
+```mermaid
+flowchart TB
+  subgraph prep["Before any app"]
+    master["Mezzanine<br/>playpath-bars"]
+    packager["Shaka Packager or ffmpeg"]
+    master --> packager
+  end
+
+  subgraph services["Local services"]
+    origin["Origin A and B<br/>Go"]
+    license["Clear Key license<br/>Go"]
+    ads["SSAI and VAST<br/>Go"]
+  end
+
+  subgraph devices["Devices"]
+    web["Web<br/>React, Shaka, hls.js"]
+    android["Android<br/>Compose, Media3"]
+    ios["iOS<br/>UIKit, AVPlayer"]
+    mobile["React Native<br/>native engines"]
+  end
+
+  monitor["Playback events"]
+
+  packager --> origin
+  origin --> ads
+  ads --> web
+  ads --> android
+  ads --> ios
+  ads --> mobile
+  web --> license
+  android --> license
+  web --> monitor
+  android --> monitor
+  ios --> monitor
+  mobile --> monitor
+```
+
+iOS asks FairPlay in production. In this PoC it plays clear HLS and does not call the Clear Key service. That boundary is [ADR-003](architecture-decision-records.md).
+
+## 2. What each phase owns
+
+### Phase 1 — Master
+
+The finished programme arrives as one file. It is not segmented, encrypted, or sized for a phone. Every later copy is derived from it. The apps never open it.
+
+Output: the packager.
+
+### Phase 2 — Package
+
+The packager cuts the master into short segments and writes two menus that describe one timeline.
+
+- **HLS.** Apple’s format. The menu is an `.m3u8` playlist. A master playlist lists the renditions. Safari, iOS, and tvOS play HLS natively.
+- **DASH.** The MPEG menu is an `.mpd`. Android, Chrome, and most smart-TV stacks expect it.
+- **CMAF.** One fragmented-MP4 ladder, two manifests. Packaging two independent encodes would double the files that can be wrong. Two menus exist because the devices disagree about the playlist format. See [ADR-002](architecture-decision-records.md).
+
+The apps never do this work.
+
+### Phase 3 — Encrypt
+
+Segments are encrypted once with MPEG Common Encryption. A downloaded chunk is useless until a license step supplies the key, and the platform CDM decrypts in its own memory.
+
+The lab key system is W3C Clear Key. Production devices do not share one DRM:
+
+| System | Required on | Asked for by |
+|---|---|---|
+| FairPlay | Safari, iOS, tvOS | AVFoundation |
+| Widevine | Chrome, Android, Android TV | EME, ExoPlayer / Media3 |
+| PlayReady | Many smart TVs, Edge | EME |
+
+Clear Key proves the encrypt-then-license shape on web and Android. It does not prove a production CDM. See [ADR-003](architecture-decision-records.md).
+
+### Phase 4 — CDN
+
+Encrypted segments and both menus are files on an HTTP origin. The player requests a few seconds at a time. A failed chunk can be fetched again. A second origin is the resilience add-on. See [ADR-010](architecture-decision-records.md).
+
+No app language owns this phase.
+
+### Phase 5 — Ads
+
+A break is either cut into the stream on the server, or played by the app as a second piece of media.
+
+- **SSAI.** A Go service returns a menu in which the pre-roll is already part of the presentation. The player treats it as more of the stream. If that rewriter fails, the app loads the clean film.
+- **CSAI.** The film menu stays intact. At 10 seconds the engine pauses, the app reads a VAST document, the engine plays the creative, then seeks back to that second.
+- The app fires an impression for both, so a stitched ad is still counted.
+
+### Phase 6 — The app and the engines
+
+The app asks an engine to play a URL. The engine fetches the menu, chooses the bitrate, decrypts, decodes, and hands frames to the screen. The UI sends play, pause, and seek.
+
+| Device | UI | Engine | Usual format in this lab |
+|---|---|---|---|
+| Android | Kotlin, Jetpack Compose | Media3 ExoPlayer | DASH |
+| iOS | Swift, UIKit | AVFoundation `AVPlayer` | HLS |
+| Chrome, Edge, Firefox | TypeScript, React | Shaka for DASH and for DRM; hls.js for clear HLS | DASH and HLS |
+| Safari | TypeScript, React | Native HLS, or Shaka when the title is encrypted | HLS |
+| React Native | TypeScript | The same Media3 and `AVPlayer` engines, behind a native view | The menu that engine plays |
+| Chromecast, LG, Samsung web | JavaScript | A receiver page or the TV’s player | HLS or DASH |
+
+Four engines means four failure modes. A bug in Media3 does not show up on iOS. That is why phase 10 uses one event shape.
+
+### Phase 7 — License
+
+Phase 3 locked the files in advance. Phase 7 is per viewer, per device, at the moment they press play. The same ciphertext serves everyone. The key is personal.
+
+- Web: Shaka uses Encrypted Media Extensions. The JavaScript never holds the key. The CDM does.
+- Android: Media3 opens a DRM session.
+- iOS production: a content-key session on the asset. The PoC plays clear HLS and documents that session.
+
+hls.js is the wrong place to hang DRM. A title that needs DASH plus a key system belongs in Shaka.
+
+If the key is late, startup time goes up. If it never comes, the screen stays black. The license service does not hand out the clear package instead.
+
+### Phase 8 — Buffer, ABR, decode
+
+The engine downloads the first segments, picks a bitrate, and steps down if the network slows. That switch is ABR. Decoders are platform code. The UI language receives events: playing, stalled, quality changed.
+
+Retries are ordered: fetch the segment again, then step down a rung, then fail to the backup origin.
+
+A stall is fixed here. A bad ad cut is fixed here when CSAI seeks to the wrong time, or in phase 5 when SSAI built the wrong menu.
+
+### Phase 9 — Controls
+
+The part a person sees and touches. Play, pause, seek, the title, and the layout. Product controls replace the engine’s default bar.
+
+| Platform | Where styling is written |
+|---|---|
+| Android | Kotlin, in the Compose theme |
+| iOS | Swift, on UIKit views |
+| Web | CSS. TypeScript attaches the class |
+| React Native | A style object in TypeScript |
+
+You can redesign the screens without touching the packager. You cannot fix a stall by changing the layout. The control must mirror engine state. Rules: [ux-controls.md](ux-controls.md).
+
+### Phase 10 — Monitor
+
+Each engine reports the same facts, or an outage on one device stays invisible. The schema is [playback-events.md](playback-events.md). Kotlin, Swift, and TypeScript all emit it. One log is the audit trail. If a phase is not measured, it is not operated.
+
+## 3. Press play
+
+Phases 1 to 4 have already finished before this sequence. Phase 5 has either stitched a pre-roll or left the mid-roll cue in place.
+
+```mermaid
+sequenceDiagram
+  participant Person
+  participant UI as Controls
+  participant App as App session
+  participant Engine
+  participant Ads as Ads service
+  participant Origin
+  participant License as License service
+  participant Log as Playback events
+
+  Person->>UI: Play
+  UI->>App: play intent
+  App->>Ads: stitched menu, else clean menu
+  Ads-->>App: manifest URL
+  App->>Engine: load URL
+  Engine->>Origin: menu and first segments
+  Engine->>License: key request
+  License-->>Engine: key, or error
+  Engine-->>App: playing, or drm error
+  App-->>UI: state
+  App-->>Log: startup, drm
+  Note over Engine: Mid-roll cue
+  Engine-->>App: cue
+  App->>Engine: pause, play ad, seek to cue
+  App-->>Log: ad
+  Engine-->>App: bitrate and stall
+  App-->>Log: bitrate, stall
+  Person->>UI: Pause
+  UI->>App: pause intent
+  App->>Engine: pause
+  Engine-->>UI: paused
+```
+
+## 4. Repository layout
+
+The roadmap builds this tree. Today the repository contains `docs/`, this architecture, the root README, and the license.
+
+```
+playpath-lab/
+├── pipeline/                 # phases 1–3: mezzanine to encrypted CMAF
+├── services/
+│   ├── origin/               # phase 4
+│   ├── license/              # phases 3 and 7
+│   └── ads/                  # phase 5
+├── apps/
+│   ├── web/                  # React, Shaka, hls.js
+│   ├── android/              # Compose, Media3
+│   ├── ios/                  # UIKit, AVPlayer
+│   └── mobile/               # React Native
+├── packages/
+│   └── playback-events/      # phase 10 schema
+├── docs/
+├── LICENSE
+└── README.md
+```
+
+## 5. Languages, and what they are not
+
+| Language | Where it is written | Why it is there |
+|---|---|---|
+| TypeScript | Web, React Native, the event schema | Most screens. The authoring language for the browser and the shared mobile UI |
+| JavaScript | Shaka, hls.js, the compiled web app, TV web runtimes | The web runtime. We depend on it even when we type TypeScript |
+| Kotlin | Android | Compose and the Media3 configuration live here |
+| Swift | iOS | UIKit and AVFoundation live here |
+| Go | Origin, license, SSAI | Phases 4, 7, and 5. The license service fails closed |
+| C++ | Packager, decoders, CDM | Not application code. Phases 2, 7, and 8 |
+| Java | Inside Media3 | The engine’s history. The UI is Kotlin |
+| Objective-C | Under AVFoundation | Apple’s older media API. Swift calls it |
+
+None of the four app languages can replace the packager or the license service. Standards: [docs/README.md](README.md). Dependencies we call and do not restyle: [standards/dependencies.md](standards/dependencies.md).
+
+## 6. What is resilient, and what is accepted
+
+Solid, and in the PoC:
+
+- Short segments, so a failed chunk is fetched again
+- ABR, so the picture gets softer instead of stopping
+- SSAI, so the pre-roll is one presentation
+- A fallback from the stitched menu to the clean film
+- A second origin, and a license process that can be restarted
+
+Accepted, because the devices require it:
+
+- One logical player, and a different engine on each platform
+- DRM fails closed
+- SSAI puts risk on the service that rewrites the playlist
+- CSAI fails at the seam between film and ad
+- Two menus, HLS and DASH, over one media ladder
+
+The resilience is retries, a fallback stream, and more than one place to fetch segments and keys. It is not the number of engines.
+
+## 7. Patterns
+
+The structure follows the way each official player is meant to be embedded.
+
+| Source | Pattern we follow |
+|---|---|
+| [Media3](https://developer.android.com/media/media3/exoplayer) | The app builds an `ExoPlayer`, passes a `MediaItem`, and listens. The player owns buffering, track selection, and DRM sessions |
+| [AVFoundation](https://developer.apple.com/documentation/avfoundation/avplayer) | Swift holds an `AVPlayer`. The view observes `timeControlStatus` and `currentItem`. FairPlay, when added, is an `AVContentKeySession` on the asset |
+| [Shaka Player](https://shaka-project.github.io/shaka-player/docs/api/tutorial-welcome.html) | The page owns a `shaka.Player`, calls `load`, and configures DRM servers. EME stays inside the browser |
+| [hls.js](https://github.com/video-dev/hls.js/) | `Hls` attaches to a media element, reads the playlist, and appends buffers through Media Source Extensions |
+| [React](https://react.dev/learn/thinking-in-react) and [Compose state](https://developer.android.com/develop/ui/compose/state) | UI state is a snapshot of engine events. Events go down. Intents go up |
+| [Effective Go](https://go.dev/doc/effective_go) | Small services with explicit errors. The license handler returns an error status and stops |
+
+Inside each app the session looks the same:
+
+```mermaid
+flowchart LR
+  controls["Controls"] -->|intents| session["Playback session"]
+  session -->|load play pause seek| engine["Engine"]
+  engine -->|events| session
+  session -->|view state| controls
+  session -->|JSON| telemetry["Playback events"]
+```
+
+The session is the only type that talks to the engine. Controls never import Shaka, hls.js, Media3, or AVFoundation.
+
+## 8. Glossary
+
+| Term | Meaning |
+|---|---|
+| Mezzanine | The master file. High quality, not a streaming menu |
+| CMAF | One fragmented-MP4 media layout that both HLS and DASH can point at |
+| ABR | Adaptive bitrate. The engine changes rung as throughput changes |
+| EME | Encrypted Media Extensions. The browser API for a key request. The page does not receive the raw key |
+| CDM | Content decryption module. Platform code that applies the key |
+| Clear Key | The EME key system `org.w3.clearkey`, used here as the lab license |
+| CENC | MPEG Common Encryption of the segments |
+| SSAI | Server-side ad insertion. One menu contains the ad |
+| CSAI | Client-side ad insertion. The app plays a second piece of media at a cue |
+| VAST | The IAB document that describes that second piece of media |
+
+## 9. Sources
+
+- [HTTP Live Streaming](https://developer.apple.com/documentation/http-live-streaming)
+- [HLS Authoring Specification for Apple Devices](https://developer.apple.com/documentation/http-live-streaming/hls-authoring-specification-for-apple-devices)
+- [DASH Industry Forum guidelines](https://dashif.org/guidelines/)
+- [W3C Media Source Extensions](https://www.w3.org/TR/media-source/)
+- [W3C Encrypted Media Extensions](https://www.w3.org/TR/encrypted-media/)
+- [FairPlay Streaming](https://developer.apple.com/streaming/fps/)
+- [Android Media3 ExoPlayer](https://developer.android.com/media/media3/exoplayer) and [DRM](https://developer.android.com/media/media3/exoplayer/drm)
+- [AVFoundation](https://developer.apple.com/documentation/avfoundation)
+- [Shaka Player](https://shaka-project.github.io/shaka-player/docs/api/tutorial-welcome.html) and [Shaka Packager](https://github.com/shaka-project/shaka-packager)
+- [hls.js](https://github.com/video-dev/hls.js/)
+- [IAB VAST](https://iabtechlab.com/standards/vast/)
+- [Jetpack Compose](https://developer.android.com/compose)
+- [React](https://react.dev/)
+- [React Native](https://reactnative.dev/)
+
+## 10. Related docs
+
+- [Happy path](happy-path.md)
+- [Engines](engines.md)
+- [Roadmap](roadmap.md)
+- [Definition of Done](DoD.md)
+- [Beyond the PoC](beyond-poc.md)
+- [Playback events](playback-events.md)
+- [Controls and UX](ux-controls.md)
