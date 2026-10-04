@@ -4,7 +4,7 @@ One title, many devices. The lab follows a single programme from the master file
 
 License: MIT
 
-This repository is the proof of that path. **Today:** the documents in [`docs/`](docs/README.md) define the architecture, and `./pipeline/master.sh` writes the phase 1 mezzanine ([PP-010](https://github.com/SDS37/playpath-lab/issues/12)). Packaging, the local services, and the apps are not built yet. When they exist, the [Definition of Done](docs/DoD.md) is the checklist.
+This repository is the proof of that path. **Today:** the documents in [`docs/`](docs/README.md) define the architecture. `./pipeline/master.sh` writes the phase 1 mezzanine ([PP-010](https://github.com/SDS37/playpath-lab/issues/12)). `./pipeline/hls.sh` writes the CMAF ladder and the HLS menu ([PP-020](https://github.com/SDS37/playpath-lab/issues/13)). DASH, the local services, and the apps are not built yet. When they exist, the [Definition of Done](docs/DoD.md) is the checklist.
 
 ## Current status
 
@@ -12,10 +12,11 @@ This repository is the proof of that path. **Today:** the documents in [`docs/`]
 |---|---|
 | Business and technical requirements | Written |
 | Architecture, ADRs, engines, happy path | Written |
-| Roadmap M0 | Done (docs). M1 command exists. M2–M10 not started |
+| Roadmap M0 | Done (docs). M1 command exists. M2 HLS command exists. DASH and M3–M10 not started |
 | Code standards (TypeScript, JavaScript, React, React Native, CSS, Kotlin, Swift, Go) | Written |
 | Master file | `./pipeline/master.sh` writes `pipeline/master/playpath-bars.mp4` and `.vtt` |
-| Packager, origin, license, ads | Not started |
+| Packager | `./pipeline/hls.sh` writes the CMAF ladder and `master.m3u8`. DASH is not started |
+| Origin, license, ads | Not started |
 | Web, Android, iOS, React Native players | Not started |
 | Colleague runbook that plays the title | Not started. It lands with the apps, as the last line of the DoD |
 
@@ -119,6 +120,16 @@ Requires `ffmpeg` and `ffprobe` on `PATH`, with libx264 and the native AAC encod
 That writes `pipeline/master/playpath-bars.mp4` (60 seconds, 1920×1080 H.264, closed GOP, stereo AAC-LC) and `pipeline/master/playpath-bars.vtt`. The mp4 is the mezzanine, the intermediate other encodes are made from. The `.vtt` is a sidecar: captions in a companion file, not burned into the picture. The tiers are defined in [Phase 1 of the architecture](docs/architecture.md#phase-1--master). Those files are build products and are not committed. Pass a WebVTT path to use that caption file instead of the default cues. The directory stays free of `.m3u8` and `.mpd` files.
 
 There is no player on port 5173 yet.
+
+## Package HLS
+
+Requires the mezzanine from `./pipeline/master.sh`, plus `ffmpeg` and `ffprobe` on `PATH`. From the repository root:
+
+```bash
+./pipeline/hls.sh
+```
+
+That writes `pipeline/package/playpath-bars/`: two H.264 video rungs (1280×720 and 1920×1080), one stereo AAC-LC rendition, and the WebVTT captions, as fragmented MP4 with an HLS multivariant playlist. Segment duration is 6 seconds, the duration in the [HLS Authoring Specification for Apple Devices](https://developer.apple.com/documentation/http-live-streaming/hls-authoring-specification-for-apple-devices) (items 7.5 and 7.6), recorded in [`pipeline/timeline`](pipeline/timeline) so DASH can cut the same timeline. Those files are build products and are not committed. The master directory stays free of playlists. DASH is not written yet.
 
 ## Commit convention
 
