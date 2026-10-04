@@ -23,7 +23,7 @@ A requirement is met only when the observation can be repeated from the reposito
 | Ad pre-roll | About 5 seconds, stitched by the SSAI service |
 | Ad mid-roll | Cue at 10 seconds, VAST linear creative, played by the client |
 
-The mezzanine is an input. It is not an `.m3u8` or an `.mpd`.
+The mezzanine is an input. It is not an `.m3u8` or an `.mpd`. What “mezzanine” and “sidecar” mean is in [Phase 1 of the architecture](architecture.md#phase-1--master).
 
 ## Phase 1 — Master
 

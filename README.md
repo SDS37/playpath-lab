@@ -4,7 +4,7 @@ One title, many devices. The lab follows a single programme from the master file
 
 License: MIT
 
-This repository is the proof of that path. **Today:** the documents in [`docs/`](docs/README.md) define the architecture, the requirements, the standards, and the demo. The pipeline, the local services, and the apps are not built yet. When they exist, the [Definition of Done](docs/DoD.md) is the checklist.
+This repository is the proof of that path. **Today:** the documents in [`docs/`](docs/README.md) define the architecture, and `./pipeline/master.sh` writes the phase 1 mezzanine ([PP-010](https://github.com/SDS37/playpath-lab/issues/12)). Packaging, the local services, and the apps are not built yet. When they exist, the [Definition of Done](docs/DoD.md) is the checklist.
 
 ## Current status
 
@@ -12,9 +12,10 @@ This repository is the proof of that path. **Today:** the documents in [`docs/`]
 |---|---|
 | Business and technical requirements | Written |
 | Architecture, ADRs, engines, happy path | Written |
-| Roadmap M0 | Done (docs). M1–M10 not started |
+| Roadmap M0 | Done (docs). M1 command exists. M2–M10 not started |
 | Code standards (TypeScript, JavaScript, React, React Native, CSS, Kotlin, Swift, Go) | Written |
-| Master file, packager, origin, license, ads | Not started |
+| Master file | `./pipeline/master.sh` writes `pipeline/master/playpath-bars.mp4` and `.vtt` |
+| Packager, origin, license, ads | Not started |
 | Web, Android, iOS, React Native players | Not started |
 | Colleague runbook that plays the title | Not started. It lands with the apps, as the last line of the DoD |
 
@@ -107,7 +108,17 @@ playpath-lab/
 
 Start with the [happy path](docs/happy-path.md) if you want the demo in order. Start with [architecture](docs/architecture.md) if you want each phase and the language that owns it. Standards apply once a milestone in the [roadmap](docs/roadmap.md) creates that code.
 
-There is no install step yet. When M1 lands, this README gains the commands. Until then, do not expect a player on port 5173.
+## Generate the master
+
+Requires `ffmpeg` and `ffprobe` on `PATH`, with libx264 and the native AAC encoder. From the repository root:
+
+```bash
+./pipeline/master.sh
+```
+
+That writes `pipeline/master/playpath-bars.mp4` (60 seconds, 1920×1080 H.264, closed GOP, stereo AAC-LC) and `pipeline/master/playpath-bars.vtt`. The mp4 is the mezzanine, the intermediate other encodes are made from. The `.vtt` is a sidecar: captions in a companion file, not burned into the picture. The tiers are defined in [Phase 1 of the architecture](docs/architecture.md#phase-1--master). Those files are build products and are not committed. Pass a WebVTT path to use that caption file instead of the default cues. The directory stays free of `.m3u8` and `.mpd` files.
+
+There is no player on port 5173 yet.
 
 ## Commit convention
 
