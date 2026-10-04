@@ -84,6 +84,22 @@ iOS asks FairPlay in production. In this PoC it plays clear HLS and does not cal
 
 The finished programme arrives as one file. It is not segmented, encrypted, or sized for a phone. Every later copy is derived from it. The apps never open it.
 
+In this lab that file is a **mezzanine**, and the captions are a **WebVTT sidecar**.
+
+A mezzanine is the intermediate master video file. It is not the camera original, and it is not the final delivery encode. Media workflows keep files in three rough tiers:
+
+| Tier | What it is | Typical form |
+|---|---|---|
+| Acquisition | The highest-quality source | Camera raw, ProRes 4444, DPX |
+| Mezzanine | A high-quality intermediate, and the source for every later transcode | ProRes 422 HQ, DNxHR HQX, or a high-bitrate H.264 or HEVC file |
+| Distribution | The smaller files that are actually played | HLS and DASH renditions, progressive MP4s |
+
+The mezzanine is good enough to derive web, broadcast, and social versions without going back to the original. `playpath-bars` has no camera original. Phase 1 writes a high-bitrate H.264 mezzanine, and every later encode is made from that file.
+
+A sidecar is a companion file that travels with the media instead of being embedded in it. The WebVTT sidecar is a separate `.vtt` timed-text file for captions. It sits next to the mezzanine. It is not burned into the picture, and it is not muxed into the video. Players load it alongside the media.
+
+`./pipeline/master.sh` writes those two files: `playpath-bars.mp4` and `playpath-bars.vtt`.
+
 Output: the packager.
 
 ### Phase 2 — Package
@@ -302,7 +318,9 @@ The session is the only type that talks to the engine. Controls never import Sha
 
 | Term | Meaning |
 |---|---|
-| Mezzanine | The master file. High quality, not a streaming menu |
+| Mezzanine | The high-quality intermediate that later encodes are made from. Phase 1. Not the camera original, and not an HLS or DASH rendition. See [Phase 1](#phase-1--master) |
+| Sidecar | A companion file that travels next to the media instead of being burned in or muxed. The captions are a WebVTT sidecar |
+| WebVTT | Timed-text captions in a separate `.vtt` file |
 | CMAF | One fragmented-MP4 media layout that both HLS and DASH can point at |
 | ABR | Adaptive bitrate. The engine changes rung as throughput changes |
 | EME | Encrypted Media Extensions. The browser API for a key request. The page does not receive the raw key |
