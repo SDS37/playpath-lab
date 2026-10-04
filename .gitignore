@@ -1,5 +1,5 @@
 # Phase 1 build products. Regenerate with ./pipeline/master.sh
 pipeline/master/
 
-# Phase 2 build products. Regenerate with ./pipeline/hls.sh
+# Phase 2 build products. Regenerate with ./pipeline/hls.sh and ./pipeline/dash.sh
 pipeline/package/

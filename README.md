@@ -4,7 +4,7 @@ One title, many devices. The lab follows a single programme from the master file
 
 License: MIT
 
-This repository is the proof of that path. **Today:** the documents in [`docs/`](docs/README.md) define the architecture. `./pipeline/master.sh` writes the phase 1 mezzanine ([PP-010](https://github.com/SDS37/playpath-lab/issues/12)). `./pipeline/hls.sh` writes the CMAF ladder and the HLS menu ([PP-020](https://github.com/SDS37/playpath-lab/issues/13)). DASH, the local services, and the apps are not built yet. When they exist, the [Definition of Done](docs/DoD.md) is the checklist.
+This repository is the proof of that path. **Today:** the documents in [`docs/`](docs/README.md) define the architecture. `./pipeline/master.sh` writes the phase 1 mezzanine ([PP-010](https://github.com/SDS37/playpath-lab/issues/12)). `./pipeline/hls.sh` writes the CMAF ladder and the HLS menu ([PP-020](https://github.com/SDS37/playpath-lab/issues/13)). `./pipeline/dash.sh` writes the DASH menu for those same segments ([PP-021](https://github.com/SDS37/playpath-lab/issues/14)). The local services and the apps are not built yet. When they exist, the [Definition of Done](docs/DoD.md) is the checklist.
 
 ## Current status
 
@@ -12,10 +12,10 @@ This repository is the proof of that path. **Today:** the documents in [`docs/`]
 |---|---|
 | Business and technical requirements | Written |
 | Architecture, ADRs, engines, happy path | Written |
-| Roadmap M0 | Done (docs). M1 command exists. M2 HLS command exists. DASH and M3–M10 not started |
+| Roadmap M0 | Done (docs). M1 and M2 package commands exist. M3–M10 not started |
 | Code standards (TypeScript, JavaScript, React, React Native, CSS, Kotlin, Swift, Go) | Written |
 | Master file | `./pipeline/master.sh` writes `pipeline/master/playpath-bars.mp4` and `.vtt` |
-| Packager | `./pipeline/hls.sh` writes the CMAF ladder and `master.m3u8`. DASH is not started |
+| Packager | `./pipeline/hls.sh` writes the CMAF ladder and `master.m3u8`. `./pipeline/dash.sh` writes `manifest.mpd` for the same segments |
 | Origin, license, ads | Not started |
 | Web, Android, iOS, React Native players | Not started |
 | Colleague runbook that plays the title | Not started. It lands with the apps, as the last line of the DoD |
@@ -129,7 +129,17 @@ Requires the mezzanine from `./pipeline/master.sh`, plus `ffmpeg` and `ffprobe` 
 ./pipeline/hls.sh
 ```
 
-That writes `pipeline/package/playpath-bars/`: two H.264 video rungs (1280×720 and 1920×1080), one stereo AAC-LC rendition, and the WebVTT captions, as fragmented MP4 with an HLS multivariant playlist. Segment duration is 6 seconds, the duration in the [HLS Authoring Specification for Apple Devices](https://developer.apple.com/documentation/http-live-streaming/hls-authoring-specification-for-apple-devices) (items 7.5 and 7.6), recorded in [`pipeline/timeline`](pipeline/timeline) so DASH can cut the same timeline. Those files are build products and are not committed. The master directory stays free of playlists. DASH is not written yet.
+That writes `pipeline/package/playpath-bars/`: two H.264 video rungs (1280×720 and 1920×1080), one stereo AAC-LC rendition, and the WebVTT captions, as fragmented MP4 with an HLS multivariant playlist. Segment duration is 6 seconds, the duration in the [HLS Authoring Specification for Apple Devices](https://developer.apple.com/documentation/http-live-streaming/hls-authoring-specification-for-apple-devices) (items 7.5 and 7.6), recorded in [`pipeline/timeline`](pipeline/timeline). Those files are build products and are not committed. The master directory stays free of playlists.
+
+## Package DASH
+
+Requires the ladder from `./pipeline/hls.sh`. From the repository root:
+
+```bash
+./pipeline/dash.sh
+```
+
+That writes `pipeline/package/playpath-bars/manifest.mpd`. The MPD lists the same two video rungs, the audio rendition, and the WebVTT sidecar. Segment times come from the CMAF segments already on disk. The command does not encode a second ladder.
 
 ## Commit convention
 

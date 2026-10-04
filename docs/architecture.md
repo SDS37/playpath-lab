@@ -110,7 +110,7 @@ The packager cuts the master into short segments and writes two menus that descr
 - **DASH.** The MPEG menu is an `.mpd`. Android, Chrome, and most smart-TV stacks expect it.
 - **CMAF.** One fragmented-MP4 ladder, two manifests. Packaging two independent encodes would double the files that can be wrong. Two menus exist because the devices disagree about the playlist format. See [ADR-002](architecture-decision-records.md).
 
-`./pipeline/hls.sh` cuts the mezzanine into that ladder and writes the HLS menu under `pipeline/package/playpath-bars/`. The segment duration is 6 seconds, from the [HLS Authoring Specification for Apple Devices](https://developer.apple.com/documentation/http-live-streaming/hls-authoring-specification-for-apple-devices) items 7.5 and 7.6, and the value is recorded in `pipeline/timeline` so the DASH menu can use the same cut. The DASH menu is the next story. The apps never do this work.
+`./pipeline/hls.sh` cuts the mezzanine into that ladder and writes the HLS menu under `pipeline/package/playpath-bars/`. `./pipeline/dash.sh` writes the DASH menu for those same segments. It does not encode again. The segment duration is 6 seconds, from the [HLS Authoring Specification for Apple Devices](https://developer.apple.com/documentation/http-live-streaming/hls-authoring-specification-for-apple-devices) items 7.5 and 7.6, recorded in `pipeline/timeline`. The apps never do this work.
 
 ### Phase 3 — Encrypt
 
@@ -232,7 +232,7 @@ sequenceDiagram
 
 ## 4. Repository layout
 
-The roadmap builds this tree. Today the repository contains `docs/`, this architecture, the root README, the license, and `pipeline/` for the mezzanine and the HLS package.
+The roadmap builds this tree. Today the repository contains `docs/`, this architecture, the root README, the license, and `pipeline/` for the mezzanine, the HLS menu, and the DASH menu.
 
 ```
 playpath-lab/

@@ -2,7 +2,7 @@
 # Phase 2. Cut the playpath-bars mezzanine into one CMAF ladder and an HLS menu.
 # ffmpeg's HLS muxer writes the fMP4 segments. Apps do not slice the file.
 # https://ffmpeg.org/ffmpeg-formats.html#hls-2
-# DASH is a later story. It reads pipeline/timeline and these same segment files.
+# ./pipeline/dash.sh writes the DASH menu for these same segment files.
 
 set -euo pipefail
 
