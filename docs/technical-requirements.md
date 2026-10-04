@@ -18,7 +18,7 @@ A requirement is met only when the observation can be repeated from the reposito
 | Video codec | H.264, progressive, closed GOP so segment boundaries are random-access points |
 | Audio codec | AAC-LC |
 | Ladder | At least two video rungs of the same duration, plus the audio rendition and the caption track |
-| Segment duration | One duration for both menus, chosen from the [HLS Authoring Specification for Apple Devices](https://developer.apple.com/documentation/http-live-streaming/hls-authoring-specification-for-apple-devices) and applied to DASH so both menus describe the same media timeline |
+| Segment duration | 6 seconds, recorded in [`pipeline/timeline`](../pipeline/timeline). [HLS Authoring Specification for Apple Devices](https://developer.apple.com/documentation/http-live-streaming/hls-authoring-specification-for-apple-devices) items 7.5 and 7.6. DASH uses this same duration |
 | Encryption | One MPEG-CENC pass. Lab key system `org.w3.clearkey` |
 | Ad pre-roll | About 5 seconds, stitched by the SSAI service |
 | Ad mid-roll | Cue at 10 seconds, VAST linear creative, played by the client |

@@ -1,0 +1,5 @@
+# Shared by the HLS menu and the later DASH menu.
+# segment_duration: HLS Authoring Specification for Apple Devices, items 7.5 and 7.6.
+# idr_interval: same specification, item 1.13. The mezzanine GOP is already this interval.
+segment_duration=6
+idr_interval=2
