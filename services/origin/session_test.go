@@ -121,13 +121,23 @@ func TestSameSegmentOnBackupOrigin(t *testing.T) {
 	if string(payload) != string(body) {
 		t.Fatalf("backup body %q", payload)
 	}
-	direct := get(t, backupSrv.URL+"/720p/seg_5.m4s")
-	directBody, err := io.ReadAll(direct.Body)
+	primary.SetRefuseSegments(false)
+	again := get(t, failed)
+	if again.StatusCode != http.StatusOK {
+		t.Fatalf("primary after resume %d", again.StatusCode)
+	}
+	primaryBody, err := io.ReadAll(again.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(directBody) != string(body) {
+	if string(primaryBody) != string(payload) {
 		t.Fatal("origins serve different bytes")
+	}
+	if again.Header.Get("Content-Type") != got.Header.Get("Content-Type") {
+		t.Fatalf("content type %s, backup %s", again.Header.Get("Content-Type"), got.Header.Get("Content-Type"))
+	}
+	if again.Header.Get("Last-Modified") == "" || again.Header.Get("Last-Modified") != got.Header.Get("Last-Modified") {
+		t.Fatalf("Last-Modified %s, backup %s", again.Header.Get("Last-Modified"), got.Header.Get("Last-Modified"))
 	}
 }
 
