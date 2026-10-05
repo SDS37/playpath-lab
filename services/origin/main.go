@@ -1,4 +1,5 @@
-// Command origin serves the protected playpath-bars package on origin A.
+// Command origin serves the protected playpath-bars package.
+// Origin A listens on 127.0.0.1:8080. Origin B is the same server on 127.0.0.1:8081.
 package main
 
 import (
@@ -14,6 +15,7 @@ import (
 func main() {
 	addr := flag.String("addr", "127.0.0.1:8080", "listen address")
 	dir := flag.String("dir", "pipeline/protected/playpath-bars", "package directory")
+	refuse := flag.Bool("refuse-segments", false, "answer 503 for media segments")
 	flag.Parse()
 
 	handler, err := New(*dir)
@@ -24,6 +26,7 @@ func main() {
 		}
 		os.Exit(1)
 	}
+	handler.SetRefuseSegments(*refuse)
 	server := &http.Server{
 		Addr:              *addr,
 		Handler:           logStatus(handler),

@@ -132,7 +132,7 @@ Clear Key proves the encrypt-then-license shape on web and Android. It does not 
 
 Encrypted segments and both menus are files on an HTTP origin. The player requests a few seconds at a time. A failed chunk can be fetched again. A second origin is the resilience add-on. See [ADR-010](architecture-decision-records.md).
 
-`go run ./services/origin` serves `pipeline/protected/playpath-bars/` on `http://127.0.0.1:8080`. A GET of a menu or segment returns a content type and `Last-Modified`. The process does not list directories, and it does not serve the content key or the mezzanine. Origin B on port 8081 is not built yet.
+`go run ./services/origin` serves `pipeline/protected/playpath-bars/` on `http://127.0.0.1:8080`. The same command with `-addr 127.0.0.1:8081` serves that tree on origin B. A GET of a menu or segment returns a content type and `Last-Modified`. The process does not list directories, and it does not serve the content key or the mezzanine. [`services/origin/session.json`](../services/origin/session.json) names the backup base URL. When origin A refuses a media segment, the same path is requested on origin B. Picture that continues, without restarting at the first segment, waits for an engine.
 
 No app language owns this phase.
 
@@ -236,13 +236,13 @@ sequenceDiagram
 
 ## 4. Repository layout
 
-The roadmap builds this tree. Today the repository contains `docs/`, this architecture, the root README, the license, `pipeline/` for the mezzanine, the HLS menu, the DASH menu, and the protected copy, `services/origin` for origin A, and `services/license/lab-key.json` for the published lab key.
+The roadmap builds this tree. Today the repository contains `docs/`, this architecture, the root README, the license, `pipeline/` for the mezzanine, the HLS menu, the DASH menu, and the protected copy, `services/origin` for origin A and origin B, and `services/license/lab-key.json` for the published lab key.
 
 ```
 playpath-lab/
 ├── pipeline/                 # phases 1–3: mezzanine to encrypted CMAF
 ├── services/
-│   ├── origin/               # phase 4, origin A on port 8080
+│   ├── origin/               # phase 4, ports 8080 and 8081
 │   ├── license/              # phases 3 and 7
 │   └── ads/                  # phase 5
 ├── apps/

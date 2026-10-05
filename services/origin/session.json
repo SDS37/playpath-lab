@@ -1,0 +1,5 @@
+{
+  "description": "Primary and backup base URLs for the playpath-bars playback session. Origin A and origin B serve the same protected package. When a segment request on the primary origin fails, the session requests that same path on the backup origin. It does not restart the title at the first segment.",
+  "baseUrl": "http://127.0.0.1:8080",
+  "backupBaseUrl": "http://127.0.0.1:8081"
+}
