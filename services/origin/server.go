@@ -13,7 +13,8 @@ import (
 // Server serves one package tree over HTTP. It does not list directories
 // and it does not serve the lab key.
 type Server struct {
-	root string
+	root           string
+	refuseSegments bool
 }
 
 // New checks that dir is a directory and returns a server rooted there.
@@ -34,6 +35,12 @@ func New(dir string) (*Server, error) {
 
 var errNotDir = errors.New("origin root is not a directory")
 
+// SetRefuseSegments makes media segments (.m4s) return 503.
+// Menus and init segments stay available, so a later retry can ask for the same segment.
+func (s *Server) SetRefuseSegments(on bool) {
+	s.refuseSegments = on
+}
+
 // ServeHTTP answers GET and HEAD for a file in the package tree.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
@@ -49,6 +56,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	info, err := os.Stat(full)
 	if err != nil || info.IsDir() {
 		http.NotFound(w, r)
+		return
+	}
+	if s.refuseSegments && strings.EqualFold(filepath.Ext(full), ".m4s") {
+		http.Error(w, "segment refused", http.StatusServiceUnavailable)
 		return
 	}
 	f, err := os.Open(full)

@@ -4,7 +4,7 @@ One title, many devices. The lab follows a single programme from the master file
 
 License: MIT
 
-This repository is the proof of that path. **Today:** the documents in [`docs/`](docs/README.md) define the architecture. `./pipeline/master.sh` writes the phase 1 mezzanine ([PP-010](https://github.com/SDS37/playpath-lab/issues/12)). `./pipeline/hls.sh` writes the CMAF ladder and the HLS menu ([PP-020](https://github.com/SDS37/playpath-lab/issues/13)). `./pipeline/dash.sh` writes the DASH menu for those same segments ([PP-021](https://github.com/SDS37/playpath-lab/issues/14)). `./pipeline/timelines.sh` fails if the two menus diverge ([PP-022](https://github.com/SDS37/playpath-lab/issues/15)). `./pipeline/encrypt.sh` writes a CENC copy of that ladder and names the lab key id in both menus ([PP-030](https://github.com/SDS37/playpath-lab/issues/16)). `go run ./services/origin` serves that copy on `http://127.0.0.1:8080` ([PP-040](https://github.com/SDS37/playpath-lab/issues/17)). Origin B, the license service, and the apps are not built yet. When they exist, the [Definition of Done](docs/DoD.md) is the checklist.
+This repository is the proof of that path. **Today:** the documents in [`docs/`](docs/README.md) define the architecture. `./pipeline/master.sh` writes the phase 1 mezzanine ([PP-010](https://github.com/SDS37/playpath-lab/issues/12)). `./pipeline/hls.sh` writes the CMAF ladder and the HLS menu ([PP-020](https://github.com/SDS37/playpath-lab/issues/13)). `./pipeline/dash.sh` writes the DASH menu for those same segments ([PP-021](https://github.com/SDS37/playpath-lab/issues/14)). `./pipeline/timelines.sh` fails if the two menus diverge ([PP-022](https://github.com/SDS37/playpath-lab/issues/15)). `./pipeline/encrypt.sh` writes a CENC copy of that ladder and names the lab key id in both menus ([PP-030](https://github.com/SDS37/playpath-lab/issues/16)). `go run ./services/origin` serves that copy on `http://127.0.0.1:8080` ([PP-040](https://github.com/SDS37/playpath-lab/issues/17)). The same command on `http://127.0.0.1:8081` serves that copy again, and [`services/origin/session.json`](services/origin/session.json) records the second base URL. Playback that continues from that URL after a segment error is not observed yet ([PP-041](https://github.com/SDS37/playpath-lab/issues/18)). The license service and the apps are not built yet. When they exist, the [Definition of Done](docs/DoD.md) is the checklist.
 
 ## Current status
 
@@ -12,12 +12,12 @@ This repository is the proof of that path. **Today:** the documents in [`docs/`]
 |---|---|
 | Business and technical requirements | Written |
 | Architecture, ADRs, engines, happy path | Written |
-| Roadmap M0 | Done (docs). M1 and M2 package commands exist. M3 encrypt command exists. M4 origin A exists. Origin B and M5–M10 are not started |
+| Roadmap M0 | Done (docs). M1 and M2 package commands exist. M3 encrypt command exists. M4 origins A and B exist. M5–M10 are not started |
 | Code standards (TypeScript, JavaScript, React, React Native, CSS, Kotlin, Swift, Go) | Written |
 | Master file | `./pipeline/master.sh` writes `pipeline/master/playpath-bars.mp4` and `.vtt` |
 | Packager | `./pipeline/hls.sh` writes the CMAF ladder and `master.m3u8`. `./pipeline/dash.sh` writes `manifest.mpd`. `./pipeline/timelines.sh` fails if the menus diverge |
 | Encrypt | `./pipeline/encrypt.sh` writes a CENC copy. The lab key id is in both protected menus. Key bytes stay in `services/license/lab-key.json` |
-| Origin | `go run ./services/origin` serves the protected package on `http://127.0.0.1:8080`. Origin B is not built |
+| Origin | Origin A is `http://127.0.0.1:8080`. Origin B is the same package on `http://127.0.0.1:8081`. The backup base URL is `services/origin/session.json` |
 | License, ads | Not started. The license config file exists. The service does not |
 | Web, Android, iOS, React Native players | Not started |
 | Colleague runbook that plays the title | Not started. It lands with the apps, as the last line of the DoD |
@@ -69,13 +69,13 @@ A stall is fixed in playback. A control that does not match the engine is fixed 
 
 ## Repository structure
 
-Target layout. Today the repository has `docs/`, `pipeline/`, `services/origin`, and `services/license/lab-key.json`. The license service, the ads service, origin B, and the apps are not created yet.
+Target layout. Today the repository has `docs/`, `pipeline/`, `services/origin`, and `services/license/lab-key.json`. The license service, the ads service, and the apps are not created yet.
 
 ```
 playpath-lab/
 ├── pipeline/                  # phases 1–3
 ├── services/
-│   ├── origin/                # phase 4, origin A on port 8080
+│   ├── origin/                # phase 4, ports 8080 and 8081
 │   ├── license/               # phase 7, port 8082
 │   └── ads/                   # phase 5, port 8083
 ├── apps/
@@ -163,7 +163,7 @@ Requires the ladder from `./pipeline/hls.sh` and `./pipeline/dash.sh`, plus `ffm
 
 That reads the published lab test key in [`services/license/lab-key.json`](services/license/lab-key.json) and writes `pipeline/protected/playpath-bars/`. The copy is the same CMAF timeline with MPEG-CENC sample encryption. Both menus name the key id and the Clear Key system `org.w3.clearkey`. The key bytes stay in that config. The clear package is left in place for clear HLS. Captions stay in the clear. Those protected files are build products and are not committed. FairPlay, Widevine, and PlayReady need vendor credentials and are not reported as passing. See [beyond the PoC](docs/beyond-poc.md).
 
-## Origin A
+## Origin
 
 Requires the protected package from `./pipeline/encrypt.sh`, and Go on `PATH`. From the repository root:
 
@@ -171,7 +171,13 @@ Requires the protected package from `./pipeline/encrypt.sh`, and Go on `PATH`. F
 go run ./services/origin
 ```
 
-That listens on `http://127.0.0.1:8080` and serves `pipeline/protected/playpath-bars/`. `GET` and `HEAD` of a menu or segment return a content type and `Last-Modified`. `.m3u8` is `application/vnd.apple.mpegurl` and `.mpd` is `application/dash+xml`. Video fMP4 is `video/mp4`. fMP4 in the `audio` rendition is `audio/mp4`. The process does not list directories and does not serve the content key. Origin B on port 8081 is not built yet.
+That listens on `http://127.0.0.1:8080` and serves `pipeline/protected/playpath-bars/`. Origin B is a second process:
+
+```bash
+go run ./services/origin -addr 127.0.0.1:8081
+```
+
+Both serve the same files. `GET` and `HEAD` of a menu or segment return a content type and `Last-Modified`. `.m3u8` is `application/vnd.apple.mpegurl` and `.mpd` is `application/dash+xml`. Video fMP4 is `video/mp4`. fMP4 in the `audio` rendition is `audio/mp4`. The process does not list directories and does not serve the content key. [`services/origin/session.json`](services/origin/session.json) names `http://127.0.0.1:8081` as the backup base URL. `-refuse-segments` makes that process answer 503 for a media segment (`.m4s`) and leave the menus up. The same path on the other origin still returns the segment. An engine that continues playback from there is not built yet.
 
 ## Commit convention
 
