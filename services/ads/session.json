@@ -1,0 +1,7 @@
+{
+  "description": "When the stitched menu cannot be loaded, the session requests the clean menu on origin A. It does not request an impression URL first. The ads service does not serve or redirect to the clean menu.",
+  "stitchedHls": "http://127.0.0.1:8083/ssai/hls/master.m3u8",
+  "stitchedDash": "http://127.0.0.1:8083/ssai/dash/manifest.mpd",
+  "cleanHls": "http://127.0.0.1:8080/master.m3u8",
+  "cleanDash": "http://127.0.0.1:8080/manifest.mpd"
+}

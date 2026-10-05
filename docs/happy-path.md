@@ -15,7 +15,7 @@ Nothing in this script runs until the [roadmap](roadmap.md) builds it. When a st
 
 ## Press play
 
-5. **Ads, server side.** `./pipeline/preroll.sh` writes a clear pre-roll. `go run ./services/ads` returns `http://127.0.0.1:8083/ssai/hls/master.m3u8` and `http://127.0.0.1:8083/ssai/dash/manifest.mpd`. Both start with about 5 seconds of pre-roll and then the film. The clean menus stay on origin A (TR-5.1, TR-5.3). The first pictures, and an `ad` impression with `mode: ssai` and `breakId: preroll`, wait for an app (TR-5.6).
+5. **Ads, server side.** `./pipeline/preroll.sh` writes a clear pre-roll. `go run ./services/ads` returns `http://127.0.0.1:8083/ssai/hls/master.m3u8` and `http://127.0.0.1:8083/ssai/dash/manifest.mpd`. Both start with about 5 seconds of pre-roll and then the film. The clean menus stay on origin A (TR-5.1, TR-5.3). [`services/ads/session.json`](../services/ads/session.json) names that clean menu when the stitched URL fails, and does not request an impression first (TR-5.2). The first pictures, and an `ad` impression with `mode: ssai` and `breakId: preroll`, wait for an app (TR-5.6).
 6. **Engine.** The web build uses Shaka for the protected DASH menu. Chrome or Firefox, in the clear-HLS build, uses hls.js. Safari uses native HLS for the clear menu. Android uses Media3. iOS uses `AVPlayer` (TR-6.1 to TR-6.5).
 7. **License.** On the protected web and Android plays, the engine calls the license service. The control code never prints the key. Startup time includes that round trip (TR-7.1, TR-7.2, TR-10.4).
 8. **Buffer and ABR.** Picture starts before the whole file has arrived. Restricting the network moves the player to the lower rung, and a bitrate event is logged (TR-8.2, TR-10.2).
@@ -30,7 +30,7 @@ These are the designed failures. A demo that only shows the sunny path has not p
 | Step | What you do | What you see |
 |---|---|---|
 | License down | Stop the license service and press play on the protected menu | Black picture, a `drm` error event, no clear-media fallback |
-| Stitcher down | Stop the ads service and press play | The clean film plays |
+| Stitcher down | Stop the ads service. [`services/ads/session.json`](../services/ads/session.json) names the clean menu | The clean menu is on origin A. Picture of the film with no ad period waits for an app |
 | Origin A down | Play with a backup base URL and refuse segments on origin A | Playback continues from origin B |
 | Stall | Drop throughput to a crawl | A stall or a bitrate event. The control layout is the same one as before |
 

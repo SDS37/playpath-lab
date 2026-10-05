@@ -1,5 +1,6 @@
 // Command ads stitches a pre-roll in front of the protected playpath-bars film
 // and serves the VAST mid-roll. The clean film menu stays on origin A. This process does not serve it.
+// services/ads/session.json names that menu when the stitched URL fails.
 package main
 
 import (
