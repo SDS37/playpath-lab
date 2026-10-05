@@ -37,6 +37,7 @@ var errNotDir = errors.New("origin root is not a directory")
 // ServeHTTP answers GET and HEAD for a file in the package tree.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.Header().Set("Allow", "GET, HEAD")
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -60,7 +61,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			log.Printf("close: %s", err.Error())
 		}
 	}()
-	w.Header().Set("Content-Type", contentType(full))
+	w.Header().Set("Content-Type", s.contentType(full))
 	http.ServeContent(w, r, info.Name(), info.ModTime(), f)
 }
 
@@ -68,20 +69,27 @@ func (s *Server) file(urlPath string) (string, bool) {
 	if urlPath == "" || strings.HasSuffix(urlPath, "/") {
 		return "", false
 	}
-	cleaned := path.Clean("/" + urlPath)
+	// Treat a backslash as a separator before the name check, so a Windows
+	// path cannot retarget the basename after that check.
+	cleaned := path.Clean("/" + strings.ReplaceAll(urlPath, `\`, "/"))
 	if cleaned == "/" || cleaned == "." {
 		return "", false
 	}
-	base := path.Base(cleaned)
-	if base == "lab-key.json" || base == "playpath-bars.mp4" {
-		return "", false
-	}
 	rel := strings.TrimPrefix(cleaned, "/")
-	full := filepath.Join(s.root, filepath.FromSlash(rel))
-	if !inside(s.root, full) {
+	full := filepath.Clean(filepath.Join(s.root, filepath.FromSlash(rel)))
+	if !inside(s.root, full) || forbidden(filepath.Base(full)) {
 		return "", false
 	}
 	return full, true
+}
+
+func forbidden(name string) bool {
+	switch strings.ToLower(name) {
+	case "lab-key.json", "playpath-bars.mp4":
+		return true
+	default:
+		return false
+	}
 }
 
 func inside(root, full string) bool {
@@ -92,17 +100,33 @@ func inside(root, full string) bool {
 	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
-func contentType(name string) string {
-	switch strings.ToLower(filepath.Ext(name)) {
+func (s *Server) contentType(full string) string {
+	switch strings.ToLower(filepath.Ext(full)) {
 	case ".m3u8":
 		return "application/vnd.apple.mpegurl"
 	case ".mpd":
 		return "application/dash+xml"
 	case ".m4s", ".mp4":
+		if s.audioFile(full) {
+			return "audio/mp4"
+		}
 		return "video/mp4"
 	case ".vtt":
 		return "text/vtt"
 	default:
 		return "application/octet-stream"
 	}
+}
+
+func (s *Server) audioFile(full string) bool {
+	rel, err := filepath.Rel(s.root, full)
+	if err != nil {
+		return false
+	}
+	for _, part := range strings.Split(filepath.ToSlash(rel), "/") {
+		if strings.EqualFold(part, "audio") {
+			return true
+		}
+	}
+	return false
 }

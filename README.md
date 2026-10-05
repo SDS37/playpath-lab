@@ -171,7 +171,7 @@ Requires the protected package from `./pipeline/encrypt.sh`, and Go on `PATH`. F
 go run ./services/origin
 ```
 
-That listens on `http://127.0.0.1:8080` and serves `pipeline/protected/playpath-bars/`. A GET of a menu or segment returns a content type and `Last-Modified`. `.m3u8` is `application/vnd.apple.mpegurl`, `.mpd` is `application/dash+xml`, and fMP4 is `video/mp4`. The process does not list directories and does not serve the content key. Origin B on port 8081 is not built yet.
+That listens on `http://127.0.0.1:8080` and serves `pipeline/protected/playpath-bars/`. `GET` and `HEAD` of a menu or segment return a content type and `Last-Modified`. `.m3u8` is `application/vnd.apple.mpegurl` and `.mpd` is `application/dash+xml`. Video fMP4 is `video/mp4`. fMP4 in the `audio` rendition is `audio/mp4`. The process does not list directories and does not serve the content key. Origin B on port 8081 is not built yet.
 
 ## Commit convention
 
