@@ -1,5 +1,5 @@
-// Command ads stitches a pre-roll in front of the protected playpath-bars film.
-// The clean film menu stays on origin A. This process does not serve it.
+// Command ads stitches a pre-roll in front of the protected playpath-bars film
+// and serves the VAST mid-roll. The clean film menu stays on origin A. This process does not serve it.
 package main
 
 import (

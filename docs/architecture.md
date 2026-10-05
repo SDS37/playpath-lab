@@ -144,7 +144,7 @@ A break is either cut into the stream on the server, or played by the app as a s
 - **CSAI.** The film menu stays intact. At 10 seconds the engine pauses, the app reads a VAST document, the engine plays the creative, then seeks back to that second.
 - The app fires an impression for both, so a stitched ad is still counted.
 
-`./pipeline/preroll.sh` writes a clear pre-roll of about 5 seconds. `go run ./services/ads` listens on `http://127.0.0.1:8083` and returns one HLS menu and one DASH MPD. Each starts with that pre-roll and then the film. Film bytes stay on origin A. The clean menus stay at `http://127.0.0.1:8080/master.m3u8` and `http://127.0.0.1:8080/manifest.mpd`. The ads process answers 404 for those paths. Picture of the ad and then the film, and the `ad` impression, wait for an app. The VAST mid-roll is not built yet.
+`./pipeline/preroll.sh` writes a clear pre-roll of about 5 seconds and a progressive file of that creative. `go run ./services/ads` listens on `http://127.0.0.1:8083` and returns one HLS menu and one DASH MPD. Each starts with that pre-roll and then the film. Film bytes stay on origin A. The clean menus stay at `http://127.0.0.1:8080/master.m3u8` and `http://127.0.0.1:8080/manifest.mpd`. The ads process answers 404 for those paths. `GET /vast/midroll.xml` is one linear creative, an impression URL, and a cue at 10 seconds into the film. Picture of either break, the return to that second, and the `ad` impressions, wait for an app.
 
 ### Phase 6 — The app and the engines
 

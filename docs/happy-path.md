@@ -20,7 +20,7 @@ Nothing in this script runs until the [roadmap](roadmap.md) builds it. When a st
 7. **License.** On the protected web and Android plays, the engine calls the license service. The control code never prints the key. Startup time includes that round trip (TR-7.1, TR-7.2, TR-10.4).
 8. **Buffer and ABR.** Picture starts before the whole file has arrived. Restricting the network moves the player to the lower rung, and a bitrate event is logged (TR-8.2, TR-10.2).
 9. **Controls.** Pause shows a play icon only after the engine reports paused. Seek moves the film. During the mid-roll, seek does nothing to the film (TR-9.5, TR-9.6).
-10. **Mid-roll.** At 10 seconds the film pauses, the VAST creative plays, and the film returns to that second. An impression is logged (TR-5.5, TR-5.6).
+10. **Mid-roll.** `GET http://127.0.0.1:8083/vast/midroll.xml` describes one linear creative, an impression URL, and a cue at 10 seconds (TR-5.4). The film pausing, the creative playing, and the return to that second wait for an app, as does the impression (TR-5.5, TR-5.6).
 11. **Monitor.** The session’s JSON from web, Android, and iOS shares field names. Startup, the ad events, and the bitrate change are all present (TR-10.1 to TR-10.3).
 
 ## The failures that are part of the happy path

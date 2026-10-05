@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- IAB VAST 4.2. The cue is 10 seconds into playpath-bars. -->
+<VAST version="4.2" xmlns="http://www.iab.com/VAST">
+  <Ad id="midroll" adType="video">
+    <InLine>
+      <AdSystem version="1.0">playpath-lab</AdSystem>
+      <Extensions>
+        <Extension>
+          <Cue xmlns="" breakId="midroll" timeOffset="00:00:10.000"/>
+        </Extension>
+      </Extensions>
+      <Impression id="midroll"><![CDATA[http://127.0.0.1:8083/vast/impression]]></Impression>
+      <AdServingId>5f3c1a20-0510-4b10-8c00-000000000051</AdServingId>
+      <AdTitle>playpath-bars mid-roll</AdTitle>
+      <Creatives>
+        <Creative id="midroll">
+          <Linear>
+            <Duration>00:00:05</Duration>
+            <MediaFiles>
+              <MediaFile delivery="progressive" type="video/mp4" width="1280" height="720" codec="avc1.64001f,mp4a.40.2"><![CDATA[http://127.0.0.1:8083/preroll/creative.mp4]]></MediaFile>
+            </MediaFiles>
+          </Linear>
+          <UniversalAdId idRegistry="unknown">unknown</UniversalAdId>
+        </Creative>
+      </Creatives>
+    </InLine>
+  </Ad>
+</VAST>
