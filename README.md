@@ -4,7 +4,7 @@ One title, many devices. The lab follows a single programme from the master file
 
 License: MIT
 
-This repository is the proof of that path. **Today:** the documents in [`docs/`](docs/README.md) define the architecture. `./pipeline/master.sh` writes the phase 1 mezzanine ([PP-010](https://github.com/SDS37/playpath-lab/issues/12)). `./pipeline/hls.sh` writes the CMAF ladder and the HLS menu ([PP-020](https://github.com/SDS37/playpath-lab/issues/13)). `./pipeline/dash.sh` writes the DASH menu for those same segments ([PP-021](https://github.com/SDS37/playpath-lab/issues/14)). `./pipeline/timelines.sh` fails if the two menus diverge ([PP-022](https://github.com/SDS37/playpath-lab/issues/15)). `./pipeline/encrypt.sh` writes a CENC copy of that ladder and names the lab key id in both menus ([PP-030](https://github.com/SDS37/playpath-lab/issues/16)). `go run ./services/origin` serves that copy on `http://127.0.0.1:8080` ([PP-040](https://github.com/SDS37/playpath-lab/issues/17)). The same command on `http://127.0.0.1:8081` serves that copy again, and [`services/origin/session.json`](services/origin/session.json) records the second base URL. Playback that continues from that URL after a segment error is not observed yet ([PP-041](https://github.com/SDS37/playpath-lab/issues/18)). The license service and the apps are not built yet. When they exist, the [Definition of Done](docs/DoD.md) is the checklist.
+This repository is the proof of that path. **Today:** the documents in [`docs/`](docs/README.md) define the architecture. `./pipeline/master.sh` writes the phase 1 mezzanine ([PP-010](https://github.com/SDS37/playpath-lab/issues/12)). `./pipeline/hls.sh` writes the CMAF ladder and the HLS menu ([PP-020](https://github.com/SDS37/playpath-lab/issues/13)). `./pipeline/dash.sh` writes the DASH menu for those same segments ([PP-021](https://github.com/SDS37/playpath-lab/issues/14)). `./pipeline/timelines.sh` fails if the two menus diverge ([PP-022](https://github.com/SDS37/playpath-lab/issues/15)). `./pipeline/encrypt.sh` writes a CENC copy of that ladder and names the lab key id in both menus ([PP-030](https://github.com/SDS37/playpath-lab/issues/16)). `go run ./services/origin` serves that copy on `http://127.0.0.1:8080` ([PP-040](https://github.com/SDS37/playpath-lab/issues/17)). The same command on `http://127.0.0.1:8081` serves that copy again, and [`services/origin/session.json`](services/origin/session.json) records the second base URL. Playback that continues from that URL after a segment error is not observed yet ([PP-041](https://github.com/SDS37/playpath-lab/issues/18)). `./pipeline/preroll.sh` writes a clear pre-roll of about 5 seconds, and `go run ./services/ads` returns an HLS menu and a DASH MPD on `http://127.0.0.1:8083` that start with that pre-roll and then the film ([PP-050](https://github.com/SDS37/playpath-lab/issues/19)). The clean film menus stay on origin A. Playing the stitched URL, and the impression, wait for an app. The license service and the apps are not built yet. When they exist, the [Definition of Done](docs/DoD.md) is the checklist.
 
 ## Current status
 
@@ -12,13 +12,14 @@ This repository is the proof of that path. **Today:** the documents in [`docs/`]
 |---|---|
 | Business and technical requirements | Written |
 | Architecture, ADRs, engines, happy path | Written |
-| Roadmap M0 | Done (docs). M1 and M2 package commands exist. M3 encrypt command exists. M4 origins A and B exist. M5–M10 are not started |
+| Roadmap M0 | Done (docs). M1 and M2 package commands exist. M3 encrypt command exists. M4 origins A and B exist. M5 stitcher exists. The VAST document, the stitcher fallback, and M6–M10 are not started |
 | Code standards (TypeScript, JavaScript, React, React Native, CSS, Kotlin, Swift, Go) | Written |
 | Master file | `./pipeline/master.sh` writes `pipeline/master/playpath-bars.mp4` and `.vtt` |
 | Packager | `./pipeline/hls.sh` writes the CMAF ladder and `master.m3u8`. `./pipeline/dash.sh` writes `manifest.mpd`. `./pipeline/timelines.sh` fails if the menus diverge |
 | Encrypt | `./pipeline/encrypt.sh` writes a CENC copy. The lab key id is in both protected menus. Key bytes stay in `services/license/lab-key.json` |
 | Origin | Origin A is `http://127.0.0.1:8080`. Origin B is the same package on `http://127.0.0.1:8081`. The backup base URL is `services/origin/session.json` |
-| License, ads | Not started. The license config file exists. The service does not |
+| Ads | `go run ./services/ads` stitches a pre-roll in front of the film on `http://127.0.0.1:8083`. The clean menus stay on origin A |
+| License | Not started. The license config file exists. The service does not |
 | Web, Android, iOS, React Native players | Not started |
 | Colleague runbook that plays the title | Not started. It lands with the apps, as the last line of the DoD |
 
@@ -69,7 +70,7 @@ A stall is fixed in playback. A control that does not match the engine is fixed 
 
 ## Repository structure
 
-Target layout. Today the repository has `docs/`, `pipeline/`, `services/origin`, and `services/license/lab-key.json`. The license service, the ads service, and the apps are not created yet.
+Target layout. Today the repository has `docs/`, `pipeline/`, `services/origin`, `services/ads`, and `services/license/lab-key.json`. The license service, the VAST document, and the apps are not created yet.
 
 ```
 playpath-lab/
@@ -178,6 +179,17 @@ go run ./services/origin -addr 127.0.0.1:8081
 ```
 
 Both serve the same files. `GET` and `HEAD` of a menu or segment return a content type and `Last-Modified`. `.m3u8` is `application/vnd.apple.mpegurl` and `.mpd` is `application/dash+xml`. Video fMP4 is `video/mp4`. fMP4 in the `audio` rendition is `audio/mp4`. The process does not list directories and does not serve the content key. [`services/origin/session.json`](services/origin/session.json) names `http://127.0.0.1:8081` as the backup base URL. `-refuse-segments` makes that process answer 503 for a media segment (`.m4s`) and leave the menus up. The same path on the other origin still returns the segment. An engine that continues playback from there is not built yet.
+
+## Ads
+
+Requires the protected package from `./pipeline/encrypt.sh`, the pre-roll from `./pipeline/preroll.sh`, and Go on `PATH`. From the repository root:
+
+```bash
+./pipeline/preroll.sh
+go run ./services/ads
+```
+
+That listens on `http://127.0.0.1:8083`. `GET /ssai/hls/master.m3u8` and `GET /ssai/dash/manifest.mpd` start with a clear pre-roll of about 5 seconds and then the film. Film segment URLs point at `http://127.0.0.1:8080`. The clean film menus stay on that origin: `/master.m3u8` and `/manifest.mpd`. This service does not serve those paths. Playing the stitched URL, and an `ad` impression with `mode: ssai` and `breakId: preroll`, wait for an app.
 
 ## Commit convention
 
