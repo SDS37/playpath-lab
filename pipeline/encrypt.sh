@@ -43,6 +43,7 @@ cp -R "${clear}/." "${out}/"
 
 python3 - "${clear}" "${out}" "${key_file}" <<'PY'
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -138,10 +139,7 @@ def aes_ctr(key, iv8, data):
     if not data:
         return b""
     iv = iv8 + b"\x00" * 8
-    try:
-        return aes_ctr_commoncrypto(key, iv, data)
-    except OSError:
-        return aes_ctr_openssl(key, iv, data)
+    return AES_CTR(key, iv, data)
 
 
 def aes_ctr_commoncrypto(key, iv, data):
@@ -190,25 +188,43 @@ def aes_ctr_commoncrypto(key, iv, data):
 
 
 def aes_ctr_openssl(key, iv, data):
-    result = subprocess.run(
-        [
-            "openssl",
-            "enc",
-            "-aes-128-ctr",
-            "-K",
-            key.hex(),
-            "-iv",
-            iv.hex(),
-            "-nosalt",
-            "-nopad",
-        ],
-        input=data,
-        capture_output=True,
-        check=False,
-    )
+    if shutil.which("openssl") is None:
+        fail("openssl must be on PATH when CommonCrypto is not available.")
+    try:
+        result = subprocess.run(
+            [
+                "openssl",
+                "enc",
+                "-aes-128-ctr",
+                "-K",
+                key.hex(),
+                "-iv",
+                iv.hex(),
+                "-nosalt",
+                "-nopad",
+            ],
+            input=data,
+            capture_output=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        fail("openssl must be on PATH when CommonCrypto is not available.")
     if result.returncode != 0 or len(result.stdout) != len(data):
         fail("openssl could not apply AES-CTR.")
     return result.stdout
+
+
+def select_aes_ctr():
+    try:
+        aes_ctr_commoncrypto(b"\x00" * 16, b"\x00" * 16, b"\x00" * 16)
+    except OSError:
+        if shutil.which("openssl") is None:
+            fail("openssl must be on PATH when CommonCrypto is not available.")
+        return aes_ctr_openssl
+    return aes_ctr_commoncrypto
+
+
+AES_CTR = select_aes_ctr()
 
 
 def sample_entry_header(kind):
@@ -333,6 +349,22 @@ def sample_iv(track_salt, segment_index, sample_index):
     return value.to_bytes(8, "big")
 
 
+def build_saiz(sizes):
+    if any(size > 255 for size in sizes):
+        fail("Sample auxiliary info is larger than a saiz box can store.")
+    if len(set(sizes)) == 1:
+        body = bytes([sizes[0]]) + len(sizes).to_bytes(4, "big")
+    else:
+        body = bytes([0]) + len(sizes).to_bytes(4, "big") + bytes(sizes)
+    payload = b"\x00\x00\x00\x00" + body
+    return (8 + len(payload)).to_bytes(4, "big") + b"saiz" + payload
+
+
+def build_saio():
+    payload = b"\x00\x00\x00\x00" + (1).to_bytes(4, "big") + (0).to_bytes(4, "big")
+    return (8 + len(payload)).to_bytes(4, "big") + b"saio" + payload
+
+
 def build_senc(records, subsample):
     flags = b"\x00\x00\x00\x02" if subsample else b"\x00\x00\x00\x00"
     payload = flags + len(records).to_bytes(4, "big") + b"".join(records)
@@ -377,6 +409,7 @@ def encrypt_segment(path, key, kid, segment_index, track_salt, length_size):
         fail(f"{path.name} sample sizes do not fill mdat.")
     payload = bytearray(data[mdat_at + 8 : mdat_at + 8 + payload_size])
     records = []
+    aux_sizes = []
     cursor = 0
     subsample = length_size is not None
     for sample_index, size in enumerate(sizes):
@@ -403,24 +436,32 @@ def encrypt_segment(path, key, kid, segment_index, track_salt, length_size):
             record = iv
         payload[cursor : cursor + size] = sample
         records.append(record)
+        aux_sizes.append(len(record))
         cursor += size
     data[mdat_at + 8 : mdat_at + 8 + payload_size] = payload
-    # senc carries the per-sample IVs. saio offsets are file-absolute and
-    # ffmpeg rejects them on these CMAF fragments, so the segment stays self-contained.
+    # saiz describes each sample's auxiliary info and saio locates it.
+    # Inside a movie fragment the saio offset is relative to the moof.
+    saiz = build_saiz(aux_sizes)
+    saio = build_saio()
     senc = build_senc(records, subsample)
+    blob = saiz + saio + senc
     moof_at = require_box(data, b"moof")
     traf_at = require_box(data, b"traf")
-    data[trun_at:trun_at] = senc
-    grow(data, traf_at, len(senc))
-    grow(data, moof_at, len(senc))
-    trun_at += len(senc)
+    data[trun_at:trun_at] = blob
+    grow(data, traf_at, len(blob))
+    grow(data, moof_at, len(blob))
+    trun_at += len(blob)
     old_offset = int.from_bytes(
         data[trun_at + data_offset_at : trun_at + data_offset_at + 4], "big", signed=True
     )
     data[trun_at + data_offset_at : trun_at + data_offset_at + 4] = (
-        old_offset + len(senc)
+        old_offset + len(blob)
     ).to_bytes(4, "big", signed=True)
-    update_sidx(data, len(senc))
+    update_sidx(data, len(blob))
+    senc_at = trun_at - len(senc)
+    first_iv = senc_at + 16
+    saio_at = senc_at - len(saio)
+    data[saio_at + 16 : saio_at + 20] = (first_iv - moof_at).to_bytes(4, "big")
     path.write_bytes(data)
 
 
@@ -429,11 +470,44 @@ def kid_uuid(kid):
     return f"{text[0:8]}-{text[8:12]}-{text[12:16]}-{text[16:20]}-{text[20:32]}"
 
 
+def playlist_rates(path):
+    lines = path.read_text().splitlines()
+    peaks = []
+    total_bytes = 0
+    total_duration = 0.0
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        if line.startswith("#EXTINF:"):
+            duration = float(line.split(":", 1)[1].split(",", 1)[0])
+            name = lines[index + 1].strip()
+            size = (path.parent / name).stat().st_size
+            peaks.append(size * 8 / duration)
+            total_bytes += size
+            total_duration += duration
+            index += 2
+            continue
+        index += 1
+    if not peaks or total_duration <= 0:
+        fail(f"{path} has no segment durations.")
+    peak = int(max(peaks) + 0.5)
+    average = int(total_bytes * 8 / total_duration + 0.5)
+    return peak, average
+
+
+def replace_number(line, name, value, previous):
+    if value < previous:
+        fail(f"{name} fell from {previous} to {value} after encryption.")
+    return re.sub(rf"{name}=\d+", f"{name}={value}", line, count=1)
+
+
 def write_menus(kid):
+    # HLS defines URI, not KEYID. Unrecognized attributes are ignored
+    # (draft-pantos-hls-rfc8216bis-22, section 6.3.1), so the key id is
+    # carried in the URI. KEYFORMAT names Clear Key.
     key_line = (
         "METHOD=SAMPLE-AES-CTR,"
-        f'URI="{LICENSE_URL}",'
-        f"KEYID=0x{kid.hex()},"
+        f'URI="{LICENSE_URL}?keyId={kid.hex()}",'
         f'KEYFORMAT="{CLEAR_KEY_SYSTEM}",'
         'KEYFORMATVERSIONS="1"'
     )
@@ -449,7 +523,24 @@ def write_menus(kid):
             inserted = True
     if not inserted:
         fail("The HLS master has no version tag.")
-    (out / "master.m3u8").write_text("\n".join(rewritten) + "\n")
+    audio_peak, audio_average = playlist_rates(out / "audio" / "media.m3u8")
+    rated = []
+    index = 0
+    while index < len(rewritten):
+        line = rewritten[index]
+        rated.append(line)
+        if line.startswith("#EXT-X-STREAM-INF:"):
+            uri = rewritten[index + 1].strip()
+            peak, average = playlist_rates(out / uri)
+            bandwidth = peak + audio_peak
+            combined = average + audio_average
+            previous_bandwidth = int(re.search(r"BANDWIDTH=(\d+)", line).group(1))
+            previous_average = int(re.search(r"AVERAGE-BANDWIDTH=(\d+)", line).group(1))
+            line = replace_number(line, "BANDWIDTH", bandwidth, previous_bandwidth)
+            line = replace_number(line, "AVERAGE-BANDWIDTH", combined, previous_average)
+            rated[-1] = line
+        index += 1
+    (out / "master.m3u8").write_text("\n".join(rated) + "\n")
     for playlist in (out / "720p" / "media.m3u8", out / "1080p" / "media.m3u8", out / "audio" / "media.m3u8"):
         lines = playlist.read_text().splitlines()
         if any(line.startswith("#EXT-X-KEY:") for line in lines):
@@ -496,6 +587,15 @@ def write_menus(kid):
         "ContentProtection"
     ):
         fail("DASH content protection was written onto the captions.")
+    for folder in ("720p", "1080p", "audio"):
+        peak, _average = playlist_rates(out / folder / "media.m3u8")
+        match = re.search(rf'<Representation id="{folder}"[^>]*bandwidth="(\d+)"', mpd)
+        if not match:
+            fail(f"DASH has no bandwidth for {folder}.")
+        previous = int(match.group(1))
+        if peak < previous:
+            fail(f"DASH {folder} bandwidth fell from {previous} to {peak} after encryption.")
+        mpd = mpd[: match.start(1)] + str(peak) + mpd[match.end(1) :]
     (out / "manifest.mpd").write_text(mpd)
 
 

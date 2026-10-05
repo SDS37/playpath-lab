@@ -154,7 +154,7 @@ That compares each HLS media-playlist segment with the matching DASH segment, an
 
 ## Encrypt
 
-Requires the ladder from `./pipeline/hls.sh` and `./pipeline/dash.sh`, plus `ffmpeg` on `PATH`. From the repository root:
+Requires the ladder from `./pipeline/hls.sh` and `./pipeline/dash.sh`, plus `ffmpeg` and `python3` on `PATH`. macOS uses CommonCrypto for AES-CTR. Any other system also needs `openssl` on `PATH`. From the repository root:
 
 ```bash
 ./pipeline/encrypt.sh
