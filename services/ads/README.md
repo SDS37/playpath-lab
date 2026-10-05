@@ -17,6 +17,6 @@ That listens on `http://127.0.0.1:8083`.
 
 Both start with the pre-roll and then the film. Film segment URLs point at origin A, `http://127.0.0.1:8080`. The clean film menus stay there: `/master.m3u8` and `/manifest.mpd`. This service answers 404 for those paths.
 
-`GET /vast/midroll.xml` is a VAST 4.2 document with one linear creative and one impression URL. The creative is `http://127.0.0.1:8083/preroll/creative.mp4`, the progressive file from `./pipeline/preroll.sh`. The cue in that document is `00:00:10.000`, which is 10 seconds into `playpath-bars`. `GET /vast/impression` answers 204. The film menu is unchanged.
+`GET /vast/midroll.xml` is a VAST 4.2 document with one linear creative and one impression URL. The creative is the progressive file from `./pipeline/preroll.sh`, at `/preroll/creative.mp4` on this service. The impression URL is `/vast/impression` on this service. Both use the `-public` base, which defaults to `http://127.0.0.1:8083`. The cue in that document is `00:00:10.000`, which is 10 seconds into `playpath-bars`. `GET /vast/impression` answers 204. The film menu is unchanged.
 
 The playback session, when an app exists, emits an `ad` event for the pre-roll with `breakId` `preroll`, `mode` `ssai`, and `action` `impression`, and one for this break with `breakId` `midroll` and `mode` `csai`. That schema is [playback events](../../docs/playback-events.md). No app emits either event yet, and no app has played the creative or returned to the cued second.

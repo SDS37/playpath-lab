@@ -161,6 +161,25 @@ func TestVASTMidroll(t *testing.T) {
 	if impression.StatusCode != http.StatusNoContent {
 		t.Fatalf("impression status %d", impression.StatusCode)
 	}
+
+	other, err := New(handler.filmDir, handler.prerollDir, "http://127.0.0.1:8080", "http://127.0.0.1:9090")
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherSrv := httptest.NewServer(other)
+	t.Cleanup(otherSrv.Close)
+	otherResp := get(t, otherSrv.URL+"/vast/midroll.xml")
+	otherBody, err := io.ReadAll(otherResp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherText := string(otherBody)
+	if !strings.Contains(otherText, "http://127.0.0.1:9090/vast/impression") || !strings.Contains(otherText, "http://127.0.0.1:9090/preroll/creative.mp4") {
+		t.Fatalf("vast urls were not rewritten: %s", otherText)
+	}
+	if strings.Contains(otherText, "127.0.0.1:8083") {
+		t.Fatal("vast document kept the default ads base")
+	}
 }
 
 func TestPrerollFile(t *testing.T) {

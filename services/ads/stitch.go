@@ -20,6 +20,9 @@ import (
 //go:embed vast/midroll.xml
 var vastMidroll []byte
 
+// vastDocumentBase is the origin written in vast/midroll.xml. Serving replaces it with the configured public base.
+const vastDocumentBase = "http://127.0.0.1:8083"
+
 var (
 	errNoFilm    = errors.New("film package is missing")
 	errNoPreroll = errors.New("pre-roll package is missing")
@@ -112,7 +115,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	case "/vast/midroll.xml":
 		w.Header().Set("Content-Type", "application/xml")
-		http.ServeContent(w, r, "midroll.xml", time.Time{}, bytes.NewReader(vastMidroll))
+		http.ServeContent(w, r, "midroll.xml", time.Time{}, bytes.NewReader(s.vastDocument()))
 		return
 	case "/vast/impression":
 		w.WriteHeader(http.StatusNoContent)
@@ -130,6 +133,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.NotFound(w, r)
+}
+
+func (s *Server) vastDocument() []byte {
+	return bytes.ReplaceAll(vastMidroll, []byte(vastDocumentBase), []byte(s.adsBase))
 }
 
 func (s *Server) servePlaylist(w http.ResponseWriter, r *http.Request, filmRel, ctype string, build func() (string, error)) {
