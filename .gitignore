@@ -3,3 +3,6 @@ pipeline/master/
 
 # Phase 2 build products. Regenerate with ./pipeline/hls.sh and ./pipeline/dash.sh
 pipeline/package/
+
+# Phase 3 build products. Regenerate with ./pipeline/encrypt.sh
+pipeline/protected/

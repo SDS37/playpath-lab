@@ -19,7 +19,7 @@ A requirement is met only when the observation can be repeated from the reposito
 | Audio codec | AAC-LC |
 | Ladder | At least two video rungs of the same duration, plus the audio rendition and the caption track |
 | Segment duration | 6 seconds, recorded in [`pipeline/timeline`](../pipeline/timeline). [HLS Authoring Specification for Apple Devices](https://developer.apple.com/documentation/http-live-streaming/hls-authoring-specification-for-apple-devices) items 7.5 and 7.6. DASH uses this same duration |
-| Encryption | One MPEG-CENC pass. Lab key system `org.w3.clearkey` |
+| Encryption | One MPEG-CENC pass. Lab key system `org.w3.clearkey`. Key bytes in [`services/license/lab-key.json`](../services/license/lab-key.json), a published lab test key |
 | Ad pre-roll | About 5 seconds, stitched by the SSAI service |
 | Ad mid-roll | Cue at 10 seconds, VAST linear creative, played by the client |
 
