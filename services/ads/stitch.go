@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -54,11 +55,19 @@ func New(filmDir, prerollDir, originBase, adsBase string) (*Server, error) {
 		}
 		return nil, err
 	}
+	origin, err := absoluteBase(originBase)
+	if err != nil {
+		return nil, errors.New("origin url is not an origin root")
+	}
+	ads, err := absoluteBase(adsBase)
+	if err != nil {
+		return nil, errors.New("ads url is not an origin root")
+	}
 	return &Server{
 		filmDir:    film,
 		prerollDir: pre,
-		originBase: strings.TrimRight(originBase, "/"),
-		adsBase:    strings.TrimRight(adsBase, "/"),
+		originBase: origin,
+		adsBase:    ads,
 		video:      video,
 		audio:      audio,
 	}, nil
@@ -375,10 +384,29 @@ func readDuration(path string) (video, audio float64, err error) {
 			audio = n
 		}
 	}
-	if video < 4.5 || video > 5.5 || audio <= 0 {
+	delta := video - audio
+	if delta < 0 {
+		delta = -delta
+	}
+	if video < 4.5 || video > 5.5 || audio <= 0 || delta > 0.04 {
 		return 0, 0, errors.New("pre-roll duration is invalid")
 	}
 	return video, audio, nil
+}
+
+func absoluteBase(raw string) (string, error) {
+	parsed, err := url.Parse(raw)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		return "", errors.New("url is not an origin root")
+	}
+	if parsed.Path != "" && parsed.Path != "/" {
+		return "", errors.New("url is not an origin root")
+	}
+	if parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", errors.New("url is not an origin root")
+	}
+	parsed.Path = ""
+	return strings.TrimRight(parsed.String(), "/"), nil
 }
 
 func rewriteAttrURI(line, prefix string) string {

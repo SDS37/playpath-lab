@@ -96,6 +96,7 @@ printf 'video=%s\naudio=%s\n' "${video_dur}" "${audio_dur}" >"${out}/duration.tx
 
 cat >"${out}/subtitles/preroll.vtt" <<'EOF'
 WEBVTT
+X-TIMESTAMP-MAP=LOCAL:00:00:00.000,MPEGTS:0
 
 00:00:00.000 --> 00:00:05.000
 Advertisement
@@ -103,6 +104,11 @@ EOF
 
 awk -v dur="${video_dur}" 'BEGIN { exit !((dur + 0) >= 4.5 && (dur + 0) <= 5.5) }' || {
   echo "Pre-roll video duration ${video_dur} is not about 5 seconds." >&2
+  exit 1
+}
+awk -v a="${video_dur}" -v b="${audio_dur}" \
+  'BEGIN { d = a - b; if (d < 0) d = -d; if (d > 0.04) exit 1 }' || {
+  echo "Audio duration ${audio_dur} does not match video duration ${video_dur}." >&2
   exit 1
 }
 

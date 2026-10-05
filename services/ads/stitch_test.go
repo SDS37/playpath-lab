@@ -92,6 +92,35 @@ func TestCleanMenuStaysOnOrigin(t *testing.T) {
 	}
 }
 
+func TestReadDurationRejectsAudioDrift(t *testing.T) {
+	dir := t.TempDir()
+	name := filepath.Join(dir, "duration.txt")
+	mustWrite(t, name, []byte("video=5.000000\naudio=5.013333\n"))
+	if _, _, err := readDuration(name); err != nil {
+		t.Fatal(err)
+	}
+	mustWrite(t, name, []byte("video=5.000000\naudio=5.100000\n"))
+	if _, _, err := readDuration(name); err == nil {
+		t.Fatal("audio more than 40 ms from video was accepted")
+	}
+}
+
+func TestNewRejectsBaseURL(t *testing.T) {
+	handler := fixture(t)
+	got, err := absoluteBase("http://127.0.0.1:8080/")
+	if err != nil || got != "http://127.0.0.1:8080" {
+		t.Fatalf("%q %v", got, err)
+	}
+	for _, raw := range []string{"127.0.0.1:8080", "http://127.0.0.1:8080/film", "http://127.0.0.1:8080?x=1", "http://127.0.0.1:8080#frag"} {
+		if _, err := New(handler.filmDir, handler.prerollDir, raw, "http://127.0.0.1:8083"); err == nil {
+			t.Fatalf("accepted origin %s", raw)
+		}
+		if _, err := New(handler.filmDir, handler.prerollDir, "http://127.0.0.1:8080", raw); err == nil {
+			t.Fatalf("accepted ads %s", raw)
+		}
+	}
+}
+
 func TestPrerollFile(t *testing.T) {
 	handler := fixture(t)
 	srv := httptest.NewServer(handler)
