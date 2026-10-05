@@ -37,4 +37,4 @@ Each file takes its rules from that technology’s official documentation. Repo 
 
 ## Status
 
-Documentation for the PoC is in this folder. The pipeline writes the mezzanine, both menus, and a CENC protected copy. The license service and the apps in the [roadmap](roadmap.md) are not built yet. Nothing in `docs/` claims a player is running.
+Documentation for the PoC is in this folder. The pipeline writes the mezzanine, both menus, and a CENC protected copy. Origin A serves that copy on `http://127.0.0.1:8080`. Origin B, the license service, and the apps in the [roadmap](roadmap.md) are not built yet. Nothing in `docs/` claims a player is running.
