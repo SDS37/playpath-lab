@@ -152,7 +152,15 @@ if not near(period, video_duration) or not near(presentation, video_duration):
 audio_folder = audio_uri.split("/", 1)[0]
 if audio_folder not in by_folder:
     fail("DASH has no audio representation.")
-compare("audio", hls_points(out / audio_uri), by_folder[audio_folder])
+audio_points = hls_points(out / audio_uri)
+compare("audio", audio_points, by_folder[audio_folder])
+audio_duration = audio_points[-1][0] + audio_points[-1][1]
+# AAC frames do not land on the video boundary. dash.sh allows 40 ms.
+if abs(audio_duration - video_duration) > 0.04:
+    fail(
+        f"Audio duration {audio_duration:.3f} is more than 0.040 seconds "
+        f"from the presentation {video_duration:.3f}."
+    )
 
 text_points = hls_points(out / text_uri)
 text_duration = text_points[-1][0] + text_points[-1][1]
