@@ -121,6 +121,48 @@ func TestNewRejectsBaseURL(t *testing.T) {
 	}
 }
 
+func TestVASTMidroll(t *testing.T) {
+	handler := fixture(t)
+	srv := httptest.NewServer(handler)
+	t.Cleanup(srv.Close)
+	resp := get(t, srv.URL+"/vast/midroll.xml")
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(body)
+	if resp.StatusCode != http.StatusOK || resp.Header.Get("Content-Type") != "application/xml" {
+		t.Fatalf("status %d type %s", resp.StatusCode, resp.Header.Get("Content-Type"))
+	}
+	if strings.Count(text, "<Linear>") != 1 || strings.Count(text, "<Impression") != 1 {
+		t.Fatalf("expected one linear creative and one impression: %s", text)
+	}
+	if !strings.Contains(text, "http://127.0.0.1:8083/vast/impression") {
+		t.Fatal("impression url missing")
+	}
+	if !strings.Contains(text, `timeOffset="00:00:10.000"`) || !strings.Contains(text, `breakId="midroll"`) {
+		t.Fatal("cue is not 10 seconds")
+	}
+	if !strings.Contains(text, "http://127.0.0.1:8083/preroll/creative.mp4") || strings.Contains(text, "playpath-bars.mp4") {
+		t.Fatal("creative is not the progressive pre-roll file")
+	}
+	if strings.Contains(text, "ffefcdab") {
+		t.Fatal("vast document included the content key")
+	}
+	creative := get(t, srv.URL+"/preroll/creative.mp4")
+	creativeBody, err := io.ReadAll(creative.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if creative.StatusCode != http.StatusOK || creative.Header.Get("Content-Type") != "video/mp4" || string(creativeBody) != "creative" {
+		t.Fatalf("creative status %d type %s", creative.StatusCode, creative.Header.Get("Content-Type"))
+	}
+	impression := get(t, srv.URL+"/vast/impression")
+	if impression.StatusCode != http.StatusNoContent {
+		t.Fatalf("impression status %d", impression.StatusCode)
+	}
+}
+
 func TestPrerollFile(t *testing.T) {
 	handler := fixture(t)
 	srv := httptest.NewServer(handler)
@@ -173,6 +215,7 @@ seg_9.m4s
 </MPD>
 `))
 	mustWrite(t, filepath.Join(pre, "duration.txt"), []byte("video=5.000000\naudio=5.013333\n"))
+	mustWrite(t, filepath.Join(pre, "creative.mp4"), []byte("creative"))
 	mustWrite(t, filepath.Join(pre, "720p", "seg_0.m4s"), []byte("ad"))
 	mustWrite(t, filepath.Join(pre, "720p", "init.mp4"), []byte("init"))
 	mustWrite(t, filepath.Join(pre, "1080p", "seg_0.m4s"), []byte("ad"))

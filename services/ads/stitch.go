@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	_ "embed"
 	"errors"
 	"fmt"
 	"log"
@@ -15,6 +16,9 @@ import (
 	"strings"
 	"time"
 )
+
+//go:embed vast/midroll.xml
+var vastMidroll []byte
 
 var (
 	errNoFilm    = errors.New("film package is missing")
@@ -55,6 +59,12 @@ func New(filmDir, prerollDir, originBase, adsBase string) (*Server, error) {
 		}
 		return nil, err
 	}
+	if _, err := os.Stat(filepath.Join(pre, "creative.mp4")); err != nil {
+		if os.IsNotExist(err) {
+			return nil, errNoPreroll
+		}
+		return nil, err
+	}
 	origin, err := absoluteBase(originBase)
 	if err != nil {
 		return nil, errors.New("origin url is not an origin root")
@@ -83,7 +93,7 @@ func (s *Server) CleanDASH() string {
 	return s.originBase + "/manifest.mpd"
 }
 
-// ServeHTTP returns the stitched menus or a pre-roll file.
+// ServeHTTP returns the stitched menus, the VAST mid-roll, or a pre-roll file.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")
@@ -99,6 +109,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	case "/ssai/dash/manifest.mpd":
 		s.servePlaylist(w, r, "manifest.mpd", "application/dash+xml", s.stitchDASH)
+		return
+	case "/vast/midroll.xml":
+		w.Header().Set("Content-Type", "application/xml")
+		http.ServeContent(w, r, "midroll.xml", time.Time{}, bytes.NewReader(vastMidroll))
+		return
+	case "/vast/impression":
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 	if rendition, ok := strings.CutPrefix(r.URL.Path, "/ssai/hls/"); ok && strings.HasSuffix(rendition, "/media.m3u8") {

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Phase 5. Write a clear pre-roll of about 5 seconds for the SSAI stitcher.
+# Phase 5. Write a clear pre-roll of about 5 seconds for the SSAI stitcher,
+# and one progressive file of that same creative for the VAST mid-roll.
 # The creative is not the film and it is not encrypted. Apps do not encode it.
 # https://ffmpeg.org/ffmpeg-formats.html#hls-2
 
@@ -77,6 +78,20 @@ encode_audio() {
 encode_video 720p 1280x720 500k
 encode_video 1080p 1920x1080 800k
 encode_audio
+
+# One progressive file for the VAST mid-roll. The fMP4 pieces above are the SSAI pre-roll.
+ffmpeg -y -hide_banner \
+  -f lavfi -i "color=c=0x00cc66:s=1280x720:r=30:d=5" \
+  -f lavfi -i "sine=frequency=880:sample_rate=48000:duration=5" \
+  -c:v libx264 -pix_fmt yuv420p -profile:v high \
+  -g 60 -keyint_min 60 \
+  -x264-params "open-gop=0:keyint=60:min-keyint=60:scenecut=0" \
+  -b:v 500k \
+  -c:a aac -profile:a aac_low -ac 2 -ar 48000 -b:a 128k \
+  -t 5 \
+  -movflags +faststart \
+  "${out}/creative.mp4"
+ffmpeg -v error -i "${out}/creative.mp4" -f null -
 
 one_segment() {
   local dir="$1"
