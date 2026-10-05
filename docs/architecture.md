@@ -144,6 +144,8 @@ A break is either cut into the stream on the server, or played by the app as a s
 - **CSAI.** The film menu stays intact. At 10 seconds the engine pauses, the app reads a VAST document, the engine plays the creative, then seeks back to that second.
 - The app fires an impression for both, so a stitched ad is still counted.
 
+`./pipeline/preroll.sh` writes a clear pre-roll of about 5 seconds. `go run ./services/ads` listens on `http://127.0.0.1:8083` and returns one HLS menu and one DASH MPD. Each starts with that pre-roll and then the film. Film bytes stay on origin A. The clean menus stay at `http://127.0.0.1:8080/master.m3u8` and `http://127.0.0.1:8080/manifest.mpd`. The ads process answers 404 for those paths. Picture of the ad and then the film, and the `ad` impression, wait for an app. The VAST mid-roll is not built yet.
+
 ### Phase 6 — The app and the engines
 
 The app asks an engine to play a URL. The engine fetches the menu, chooses the bitrate, decrypts, decodes, and hands frames to the screen. The UI sends play, pause, and seek.
@@ -236,7 +238,7 @@ sequenceDiagram
 
 ## 4. Repository layout
 
-The roadmap builds this tree. Today the repository contains `docs/`, this architecture, the root README, the license, `pipeline/` for the mezzanine, the HLS menu, the DASH menu, and the protected copy, `services/origin` for origin A and origin B, and `services/license/lab-key.json` for the published lab key.
+The roadmap builds this tree. Today the repository contains `docs/`, this architecture, the root README, the license, `pipeline/` for the mezzanine, the HLS menu, the DASH menu, and the protected copy, `services/origin` for origin A and origin B, `services/ads` for the SSAI stitcher, and `services/license/lab-key.json` for the published lab key.
 
 ```
 playpath-lab/
@@ -244,7 +246,7 @@ playpath-lab/
 ├── services/
 │   ├── origin/               # phase 4, ports 8080 and 8081
 │   ├── license/              # phases 3 and 7
-│   └── ads/                  # phase 5
+│   └── ads/                  # phase 5, SSAI on port 8083
 ├── apps/
 │   ├── web/                  # React, Shaka, hls.js
 │   ├── android/              # Compose, Media3
