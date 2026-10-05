@@ -4,7 +4,7 @@ One title, many devices. The lab follows a single programme from the master file
 
 License: MIT
 
-This repository is the proof of that path. **Today:** the documents in [`docs/`](docs/README.md) define the architecture. `./pipeline/master.sh` writes the phase 1 mezzanine ([PP-010](https://github.com/SDS37/playpath-lab/issues/12)). `./pipeline/hls.sh` writes the CMAF ladder and the HLS menu ([PP-020](https://github.com/SDS37/playpath-lab/issues/13)). `./pipeline/dash.sh` writes the DASH menu for those same segments ([PP-021](https://github.com/SDS37/playpath-lab/issues/14)). The local services and the apps are not built yet. When they exist, the [Definition of Done](docs/DoD.md) is the checklist.
+This repository is the proof of that path. **Today:** the documents in [`docs/`](docs/README.md) define the architecture. `./pipeline/master.sh` writes the phase 1 mezzanine ([PP-010](https://github.com/SDS37/playpath-lab/issues/12)). `./pipeline/hls.sh` writes the CMAF ladder and the HLS menu ([PP-020](https://github.com/SDS37/playpath-lab/issues/13)). `./pipeline/dash.sh` writes the DASH menu for those same segments ([PP-021](https://github.com/SDS37/playpath-lab/issues/14)). `./pipeline/timelines.sh` fails if the two menus diverge ([PP-022](https://github.com/SDS37/playpath-lab/issues/15)). The local services and the apps are not built yet. When they exist, the [Definition of Done](docs/DoD.md) is the checklist.
 
 ## Current status
 
@@ -15,7 +15,7 @@ This repository is the proof of that path. **Today:** the documents in [`docs/`]
 | Roadmap M0 | Done (docs). M1 and M2 package commands exist. M3–M10 not started |
 | Code standards (TypeScript, JavaScript, React, React Native, CSS, Kotlin, Swift, Go) | Written |
 | Master file | `./pipeline/master.sh` writes `pipeline/master/playpath-bars.mp4` and `.vtt` |
-| Packager | `./pipeline/hls.sh` writes the CMAF ladder and `master.m3u8`. `./pipeline/dash.sh` writes `manifest.mpd` for the same segments |
+| Packager | `./pipeline/hls.sh` writes the CMAF ladder and `master.m3u8`. `./pipeline/dash.sh` writes `manifest.mpd`. `./pipeline/timelines.sh` fails if the menus diverge |
 | Origin, license, ads | Not started |
 | Web, Android, iOS, React Native players | Not started |
 | Colleague runbook that plays the title | Not started. It lands with the apps, as the last line of the DoD |
@@ -139,7 +139,17 @@ Requires the ladder from `./pipeline/hls.sh`. From the repository root:
 ./pipeline/dash.sh
 ```
 
-That writes `pipeline/package/playpath-bars/manifest.mpd`. The MPD lists the same two video rungs, the audio rendition, and the WebVTT sidecar. Segment times come from the CMAF segments already on disk. The command does not encode a second ladder.
+That writes `pipeline/package/playpath-bars/manifest.mpd`. The MPD lists the same two video rungs, the audio rendition, and the WebVTT sidecar. Segment times come from the CMAF segments already on disk. The command does not encode a second ladder. It then runs `./pipeline/timelines.sh`.
+
+## Check the timelines
+
+Requires both menus. From the repository root:
+
+```bash
+./pipeline/timelines.sh
+```
+
+That compares each HLS media-playlist segment with the matching DASH segment, and compares the presentation duration. The command exits with an error when the menus diverge.
 
 ## Commit convention
 
