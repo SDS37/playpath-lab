@@ -10,7 +10,7 @@ Nothing in this script runs until the [roadmap](roadmap.md) builds it. When a st
 
 1. **Master.** A pipeline command writes the mezzanine and a WebVTT file. Open the master directory and confirm there is no playlist (TR-1.1).
 2. **Package.** `./pipeline/hls.sh` writes one CMAF ladder and the HLS menu. `./pipeline/dash.sh` writes the DASH menu from those same files. `./pipeline/timelines.sh` fails if the segment times or the presentation duration diverge (TR-2.1 to TR-2.4).
-3. **Encrypt.** A protected copy of those segments exists. A player that loads the protected menu with no license service stays black (TR-3.1, TR-7.3).
+3. **Encrypt.** `./pipeline/encrypt.sh` writes a CENC copy of that ladder under `pipeline/protected/playpath-bars/`. The clear package stays. A player with no key cannot decode a protected segment. The protected menus name the lab key id (TR-3.1, TR-3.2). A play with the license service down stays black once a player exists (TR-7.3).
 4. **Origin.** Origin A on port 8080 and origin B on port 8081 both serve that tree (TR-4.4).
 
 ## Press play

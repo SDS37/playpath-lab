@@ -126,6 +126,8 @@ The lab key system is W3C Clear Key. Production devices do not share one DRM:
 
 Clear Key proves the encrypt-then-license shape on web and Android. It does not prove a production CDM. See [ADR-003](architecture-decision-records.md).
 
+`./pipeline/encrypt.sh` reads the published lab key from `services/license/lab-key.json` and writes a protected copy at `pipeline/protected/playpath-bars/`. The copy is the same CMAF timeline, with MPEG-CENC sample encryption. The HLS menu and the DASH menu name that key id and the Clear Key system `org.w3.clearkey`. Captions stay in the clear. The clear package under `pipeline/package/playpath-bars/` stays, because iOS and hls.js play clear HLS. The key bytes stay in the license config. Apps do not receive them. FairPlay, Widevine, and PlayReady stay named in the [engine map](engines.md) and are not reported as passing. They need vendor credentials. See [beyond-poc.md](beyond-poc.md).
+
 ### Phase 4 — CDN
 
 Encrypted segments and both menus are files on an HTTP origin. The player requests a few seconds at a time. A failed chunk can be fetched again. A second origin is the resilience add-on. See [ADR-010](architecture-decision-records.md).
@@ -232,7 +234,7 @@ sequenceDiagram
 
 ## 4. Repository layout
 
-The roadmap builds this tree. Today the repository contains `docs/`, this architecture, the root README, the license, and `pipeline/` for the mezzanine, the HLS menu, and the DASH menu.
+The roadmap builds this tree. Today the repository contains `docs/`, this architecture, the root README, the license, `pipeline/` for the mezzanine, the HLS menu, the DASH menu, and the protected copy, and `services/license/lab-key.json` for the published lab key.
 
 ```
 playpath-lab/

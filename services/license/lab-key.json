@@ -1,0 +1,6 @@
+{
+  "description": "Published PlayPath lab test key for the Clear Key system org.w3.clearkey. It is not a FairPlay, Widevine, or PlayReady content key. ./pipeline/encrypt.sh reads it. Apps do not.",
+  "keySystem": "org.w3.clearkey",
+  "keyId": "00112233445566778899aabbccddeeff",
+  "key": "ffefcdab89674523011032547698badc"
+}
