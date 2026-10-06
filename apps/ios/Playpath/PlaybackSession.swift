@@ -68,6 +68,7 @@ final class PlaybackSession {
     private var captionText = ""
     private var captionGeneration = 0
     private let captionOutput = CaptionOutput()
+    private var activeCaptionOutput: AVPlayerItemLegibleOutput?
     private var timeObserver: Any?
     private var timeControlObservation: NSKeyValueObservation?
     private var itemStatusObservation: NSKeyValueObservation?
@@ -77,8 +78,8 @@ final class PlaybackSession {
     private var presentationObservation: NSKeyValueObservation?
 
     init() {
-        captionOutput.onCues = { [weak self] text in
-            self?.noteCaption(text)
+        captionOutput.onCues = { [weak self] output, text in
+            self?.noteCaption(text, from: output)
         }
         timeControlObservation = player.observe(\.timeControlStatus, options: [.new]) { [weak self] _, _ in
             self?.publish()
@@ -229,6 +230,7 @@ final class PlaybackSession {
         output.suppressesPlayerRendering = true
         output.setDelegate(captionOutput, queue: .main)
         item.add(output)
+        activeCaptionOutput = output
         endObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
             object: item,
@@ -574,8 +576,8 @@ final class PlaybackSession {
         ))
     }
 
-    private func noteCaption(_ text: String) {
-        if adPhase == .creative || !captions || captionText == text {
+    private func noteCaption(_ text: String, from output: AVPlayerItemLegibleOutput) {
+        if output !== activeCaptionOutput || adPhase == .creative || !captions || captionText == text {
             return
         }
         captionText = text
@@ -647,7 +649,7 @@ final class PlaybackSession {
 }
 
 private final class CaptionOutput: NSObject, AVPlayerItemLegibleOutputPushDelegate {
-    var onCues: ((String) -> Void)?
+    var onCues: ((AVPlayerItemLegibleOutput, String) -> Void)?
 
     func legibleOutput(
         _ output: AVPlayerItemLegibleOutput,
@@ -655,6 +657,6 @@ private final class CaptionOutput: NSObject, AVPlayerItemLegibleOutputPushDelega
         nativeSampleBuffers nativeSamples: [Any],
         forItemTime itemTime: CMTime
     ) {
-        onCues?(strings.map(\.string).joined(separator: "\n"))
+        onCues?(output, strings.map(\.string).joined(separator: "\n"))
     }
 }

@@ -5,7 +5,6 @@ import UIKit
 final class PlayerViewController: UIViewController {
     private let session = PlaybackSession()
     private let videoView = PlayerLayerView()
-    private let captionLabel = UILabel()
     private let controls = PlaybackControlsView()
     private var backgroundObserver: NSObjectProtocol?
     private let screenPadding: CGFloat = 12
@@ -17,24 +16,13 @@ final class PlayerViewController: UIViewController {
         videoView.accessibilityLabel = "playpath-bars"
         videoView.isAccessibilityElement = true
         controls.translatesAutoresizingMaskIntoConstraints = false
-        captionLabel.translatesAutoresizingMaskIntoConstraints = false
-        captionLabel.textColor = PlayerColors.text
-        captionLabel.backgroundColor = PlayerColors.background.withAlphaComponent(0.72)
-        captionLabel.textAlignment = .center
-        captionLabel.numberOfLines = 0
-        captionLabel.font = .preferredFont(forTextStyle: .title3)
-        captionLabel.isHidden = true
         view.addSubview(videoView)
-        videoView.addSubview(captionLabel)
         view.addSubview(controls)
         NSLayoutConstraint.activate([
             videoView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: screenPadding),
             videoView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: screenPadding),
             videoView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -screenPadding),
             videoView.bottomAnchor.constraint(equalTo: controls.topAnchor, constant: -screenPadding),
-            captionLabel.leadingAnchor.constraint(equalTo: videoView.leadingAnchor, constant: screenPadding),
-            captionLabel.trailingAnchor.constraint(equalTo: videoView.trailingAnchor, constant: -screenPadding),
-            captionLabel.bottomAnchor.constraint(equalTo: videoView.bottomAnchor, constant: -screenPadding),
             controls.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: screenPadding),
             controls.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -screenPadding),
             controls.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -screenPadding),
@@ -78,8 +66,7 @@ final class PlayerViewController: UIViewController {
     }
 
     private func showCaption(_ text: String) {
-        captionLabel.text = text
-        captionLabel.isHidden = text.isEmpty
+        videoView.showCaption(text)
         videoView.accessibilityValue = text.isEmpty ? nil : text
     }
 
@@ -90,11 +77,54 @@ final class PlayerViewController: UIViewController {
 
 /// Hosts the `AVPlayerLayer` that shows frames. Transport controls stay off.
 private final class PlayerLayerView: UIView {
+    private let captionLabel = UILabel()
+
     override class var layerClass: AnyClass {
         AVPlayerLayer.self
     }
 
     var playerLayer: AVPlayerLayer? {
         layer as? AVPlayerLayer
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        captionLabel.textColor = PlayerColors.text
+        captionLabel.backgroundColor = PlayerColors.background.withAlphaComponent(0.72)
+        captionLabel.textAlignment = .center
+        captionLabel.numberOfLines = 0
+        captionLabel.font = .preferredFont(forTextStyle: .title3)
+        captionLabel.isHidden = true
+        captionLabel.isUserInteractionEnabled = false
+        addSubview(captionLabel)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) is not used")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        guard let videoRect = playerLayer?.videoRect, !videoRect.isEmpty, !captionLabel.isHidden else {
+            return
+        }
+        let inset: CGFloat = 12
+        let maxWidth = max(0, videoRect.width - inset * 2)
+        let fitted = captionLabel.sizeThatFits(CGSize(width: maxWidth, height: videoRect.height))
+        let width = min(fitted.width, maxWidth)
+        let height = min(fitted.height, videoRect.height)
+        captionLabel.frame = CGRect(
+            x: videoRect.midX - width / 2,
+            y: videoRect.maxY - height - inset,
+            width: width,
+            height: height
+        )
+    }
+
+    func showCaption(_ text: String) {
+        captionLabel.text = text
+        captionLabel.isHidden = text.isEmpty
+        setNeedsLayout()
     }
 }
