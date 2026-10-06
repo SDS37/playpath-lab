@@ -140,6 +140,38 @@ func TestVASTAllowsTheWebPage(t *testing.T) {
 	}
 }
 
+func TestStitchedMenuAllowsTheWebPage(t *testing.T) {
+	handler := fixture(t)
+	web := httptest.NewRequest(http.MethodGet, "/ssai/dash/manifest.mpd", nil)
+	web.Header.Set("Origin", webOrigin)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, web)
+	if rec.Code != http.StatusOK || rec.Header().Get("Access-Control-Allow-Origin") != webOrigin || rec.Header().Get("Access-Control-Allow-Headers") != "Content-Type, Range" {
+		t.Fatalf("web %d origin %q headers %q", rec.Code, rec.Header().Get("Access-Control-Allow-Origin"), rec.Header().Get("Access-Control-Allow-Headers"))
+	}
+	pre := httptest.NewRequest(http.MethodGet, "/preroll/720p/seg_0.m4s", nil)
+	pre.Header.Set("Origin", webOrigin)
+	preRec := httptest.NewRecorder()
+	handler.ServeHTTP(preRec, pre)
+	if preRec.Code != http.StatusOK || preRec.Header().Get("Access-Control-Allow-Origin") != webOrigin {
+		t.Fatalf("preroll %d origin %q", preRec.Code, preRec.Header().Get("Access-Control-Allow-Origin"))
+	}
+	opt := httptest.NewRequest(http.MethodOptions, "/ssai/dash/manifest.mpd", nil)
+	opt.Header.Set("Origin", webOrigin)
+	optRec := httptest.NewRecorder()
+	handler.ServeHTTP(optRec, opt)
+	if optRec.Code != http.StatusNoContent || optRec.Header().Get("Access-Control-Allow-Origin") != webOrigin {
+		t.Fatalf("options %d origin %q", optRec.Code, optRec.Header().Get("Access-Control-Allow-Origin"))
+	}
+	other := httptest.NewRequest(http.MethodGet, "/ssai/dash/manifest.mpd", nil)
+	other.Header.Set("Origin", "http://example.test")
+	otherRec := httptest.NewRecorder()
+	handler.ServeHTTP(otherRec, other)
+	if otherRec.Code != http.StatusOK || otherRec.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Fatalf("other %d origin %q", otherRec.Code, otherRec.Header().Get("Access-Control-Allow-Origin"))
+	}
+}
+
 func TestVASTMidroll(t *testing.T) {
 	handler := fixture(t)
 	srv := httptest.NewServer(handler)

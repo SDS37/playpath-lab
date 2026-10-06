@@ -115,9 +115,19 @@ func (s *Server) CleanDASH() string {
 }
 
 // ServeHTTP returns the stitched menus, the VAST mid-roll, or a pre-roll file.
+// A page on http://127.0.0.1:5173 can read the menus and the pre-roll. Other origins cannot.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	allowWeb(w, r)
+	if r.Method == http.MethodOptions {
+		if !s.readable(r.URL.Path) {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		w.Header().Set("Allow", "GET, HEAD")
+		w.Header().Set("Allow", "GET, HEAD, OPTIONS")
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -132,7 +142,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.servePlaylist(w, r, "manifest.mpd", "application/dash+xml", s.stitchDASH)
 		return
 	case "/vast/midroll.xml":
-		allowWeb(w, r)
 		w.Header().Set("Content-Type", "application/xml")
 		http.ServeContent(w, r, "midroll.xml", time.Time{}, bytes.NewReader(s.vastDocument()))
 		return
@@ -164,6 +173,32 @@ func allowWeb(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Access-Control-Allow-Origin", webOrigin)
+	w.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Range")
+	w.Header().Set("Access-Control-Expose-Headers", "Accept-Ranges, Content-Length, Content-Range, Content-Type")
+}
+
+func (s *Server) readable(urlPath string) bool {
+	switch urlPath {
+	case "/ssai/hls/master.m3u8":
+		_, err := os.Stat(filepath.Join(s.filmDir, "master.m3u8"))
+		return err == nil
+	case "/ssai/dash/manifest.mpd":
+		_, err := os.Stat(filepath.Join(s.filmDir, "manifest.mpd"))
+		return err == nil
+	case "/vast/midroll.xml":
+		return true
+	}
+	if rendition, ok := strings.CutPrefix(urlPath, "/ssai/hls/"); ok && strings.HasSuffix(rendition, "/media.m3u8") {
+		name := strings.TrimSuffix(rendition, "/media.m3u8")
+		if name == "" || strings.Contains(name, "/") || strings.Contains(name, "..") {
+			return false
+		}
+		_, err := os.Stat(filepath.Join(s.filmDir, name, "media.m3u8"))
+		return err == nil
+	}
+	_, ok := s.prerollFile(urlPath)
+	return ok
 }
 
 func (s *Server) servePlaylist(w http.ResponseWriter, r *http.Request, filmRel, ctype string, build func() (string, error)) {
@@ -315,21 +350,31 @@ func (s *Server) prerollPeriod(bw720, bw1080, bwAudio int) string {
 `, isoDuration(s.video), bw720, videoDur, base, base, bw1080, videoDur, base, base, bwAudio, audioDur, base, base, base)
 }
 
-func (s *Server) servePreroll(w http.ResponseWriter, r *http.Request) {
-	rel := strings.TrimPrefix(r.URL.Path, "/preroll/")
-	if rel == "" || strings.HasSuffix(r.URL.Path, "/") || strings.Contains(rel, `\`) {
-		http.NotFound(w, r)
-		return
+func (s *Server) prerollFile(urlPath string) (string, bool) {
+	rel := strings.TrimPrefix(urlPath, "/preroll/")
+	if !strings.HasPrefix(urlPath, "/preroll/") || rel == "" || strings.HasSuffix(urlPath, "/") || strings.Contains(rel, `\`) {
+		return "", false
 	}
 	cleaned := path.Clean("/" + rel)
 	name := strings.TrimPrefix(cleaned, "/")
 	if name == "" || prerollHidden(name) {
-		http.NotFound(w, r)
-		return
+		return "", false
 	}
 	full := filepath.Join(s.prerollDir, filepath.FromSlash(name))
 	rootRel, err := filepath.Rel(s.prerollDir, full)
 	if err != nil || rootRel == ".." || strings.HasPrefix(rootRel, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	info, err := os.Stat(full)
+	if err != nil || info.IsDir() {
+		return "", false
+	}
+	return full, true
+}
+
+func (s *Server) servePreroll(w http.ResponseWriter, r *http.Request) {
+	full, ok := s.prerollFile(r.URL.Path)
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
