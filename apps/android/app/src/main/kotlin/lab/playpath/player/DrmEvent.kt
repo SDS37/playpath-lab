@@ -78,6 +78,14 @@ fun adEvent(
         .toString()
 }
 
+/** The film menu when the stitched URL cannot be loaded. Not an impression URL. */
+fun cleanMenu(failed: String): String? {
+    if (failed == STITCHED_DASH) {
+        return DASH_MANIFEST
+    }
+    return null
+}
+
 /** The VAST cue is 10 seconds into the film. A stitched timeline starts with the pre-roll. */
 fun presentationCueMs(cueMs: Long, manifestUrl: String): Long {
     if (manifestUrl == STITCHED_DASH) {
