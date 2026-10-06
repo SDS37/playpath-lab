@@ -15,7 +15,7 @@ That listens on `http://127.0.0.1:8083`.
 - `GET /ssai/hls/master.m3u8` is the stitched HLS menu.
 - `GET /ssai/dash/manifest.mpd` is the stitched DASH menu.
 
-Both start with the pre-roll and then the film. Film segment URLs point at origin A, `http://127.0.0.1:8080`. The clean film menus stay there: `/master.m3u8` and `/manifest.mpd`. This service answers 404 for those paths and does not redirect to them.
+Both start with the pre-roll and then the film. Film segment URLs point at origin A, `http://127.0.0.1:8080`. The clean film menus stay there: `/master.m3u8` and `/manifest.mpd`. This service answers 404 for those paths and does not redirect to them. It does not start unless the pre-roll renditions, init segments, creative, and caption are regular files. `duration.txt` is not served, in any case.
 
 [`session.json`](session.json) records the stitched menus and those clean menus. `CleanMenu` returns the clean menu when the stitched URL failed. It does not request `/vast/impression`, and it does not need this process to be running. No app has loaded that clean menu after the stitcher stopped, so picture with no ad period is not observed yet.
 

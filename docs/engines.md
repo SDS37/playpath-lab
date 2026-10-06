@@ -17,7 +17,7 @@ Which engine plays `playpath-bars` on which device, and the official way that en
 
 Primary tutorial: [Welcome](https://shaka-project.github.io/shaka-player/docs/api/tutorial-welcome.html) and [basic usage](https://shaka-project.github.io/shaka-player/docs/api/tutorial-basic-usage.html). DRM configuration: the player’s DRM tutorial in the same manual.
 
-The page installs the polyfills Shaka requires, constructs `shaka.Player` on a media element, attaches an error listener, then `load`s a manifest URI. Clear Key is a DRM server entry for `org.w3.clearkey` pointing at `services/license`. The application reads `error` and adaptation events and maps them into [playback events](playback-events.md). It does not read key material out of the EME session.
+The page installs the polyfills Shaka requires, constructs `shaka.Player` on a media element, attaches an error listener, then `load`s a manifest URI. Clear Key is a DRM server entry for `org.w3.clearkey` pointing at `http://127.0.0.1:8082/`. The application reads `error` and adaptation events and maps them into [playback events](playback-events.md). It does not read key material out of the EME session.
 
 Shaka is the web player whenever the title is encrypted, whether the menu is DASH or HLS.
 
