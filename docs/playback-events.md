@@ -12,7 +12,7 @@ Every message is one JSON object.
 |---|---|---|
 | `version` | number | `1` until a breaking change |
 | `titleId` | string | `playpath-bars` for this PoC |
-| `sessionId` | string | One id per press of play |
+| `sessionId` | string | One id per load of a menu or URL. Pause and Play again keep that id |
 | `platform` | string | `web`, `android`, `ios`, or `react-native` |
 | `engine` | string | `shaka`, `hlsjs`, `media3`, or `avplayer` |
 | `event` | string | One of the names below |
