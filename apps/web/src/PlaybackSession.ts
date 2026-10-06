@@ -39,12 +39,19 @@ export class PlaybackSession {
   #player: shaka.Player | null = null;
   #hls: Hls | null = null;
   #native = false;
+  #nativeGeneration = 0;
   #generation = 0;
   #bound = false;
   #listeners = new Set<(snapshot: PlaybackSnapshot) => void>();
   #snapshot: PlaybackSnapshot = initialSnapshot;
   #onVideo = (): void => {
     this.#publishFromVideo();
+  };
+  #onNativeError = (): void => {
+    if (!this.#native || this.#nativeGeneration !== this.#generation) {
+      return;
+    }
+    this.#fail(this.#video.error);
   };
 
   constructor(video: HTMLVideoElement) {
@@ -72,13 +79,14 @@ export class PlaybackSession {
       hlsJs: Hls.isSupported(),
       nativeHls:
         this.#video.canPlayType("application/vnd.apple.mpegurl") !== "",
+      safari: navigator.vendor === "Apple Computer, Inc.",
     });
     if (choice === "hlsjs") {
       this.#loadHlsJs(manifestUrl, generation);
       return;
     }
     if (choice === "nativeHls") {
-      this.#loadNativeHls(manifestUrl);
+      this.#loadNativeHls(manifestUrl, generation);
       return;
     }
     if (choice === undefined) {
@@ -206,8 +214,10 @@ export class PlaybackSession {
     this.#bindVideo();
   }
 
-  #loadNativeHls(manifestUrl: string): void {
+  #loadNativeHls(manifestUrl: string, generation: number): void {
     this.#native = true;
+    this.#nativeGeneration = generation;
+    this.#video.addEventListener("error", this.#onNativeError);
     this.#video.src = manifestUrl;
     this.#bindVideo();
   }
@@ -224,6 +234,7 @@ export class PlaybackSession {
       await player.destroy();
     }
     if (this.#native) {
+      this.#video.removeEventListener("error", this.#onNativeError);
       this.#native = false;
       this.#video.removeAttribute("src");
       this.#video.load();
