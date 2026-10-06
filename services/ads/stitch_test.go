@@ -283,6 +283,21 @@ func TestNewRejectsPartialPreroll(t *testing.T) {
 	}
 }
 
+func TestNewRejectsPrerollDirectory(t *testing.T) {
+	handler := fixture(t)
+	file := filepath.Join(handler.prerollDir, "creative.mp4")
+	if err := os.Remove(file); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(file, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_, err := New(handler.filmDir, handler.prerollDir, "http://127.0.0.1:8080", "http://127.0.0.1:8083")
+	if !errors.Is(err, errNoPreroll) {
+		t.Fatalf("directory creative: %v", err)
+	}
+}
+
 func fixture(t *testing.T) *Server {
 	t.Helper()
 	root := t.TempDir()

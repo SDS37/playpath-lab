@@ -72,11 +72,15 @@ func New(filmDir, prerollDir, originBase, adsBase string) (*Server, error) {
 		filepath.Join("audio", "seg_0.m4s"),
 		filepath.Join("subtitles", "preroll.vtt"),
 	} {
-		if _, err := os.Stat(filepath.Join(pre, rel)); err != nil {
+		info, err := os.Stat(filepath.Join(pre, rel))
+		if err != nil {
 			if os.IsNotExist(err) {
 				return nil, errNoPreroll
 			}
 			return nil, err
+		}
+		if !info.Mode().IsRegular() {
+			return nil, errNoPreroll
 		}
 	}
 	origin, err := absoluteBase(originBase)
