@@ -117,7 +117,8 @@
         "then": {
           "properties": { "stallMs": true },
           "required": ["stallMs"]
-        }
+        },
+        "else": { "properties": { "stallMs": false } }
       }
     },
     {

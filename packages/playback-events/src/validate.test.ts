@@ -13,6 +13,19 @@ function fixture(name: string): unknown {
   return JSON.parse(readFileSync(join(fixturesDir, name), "utf8")) as unknown;
 }
 
+function fields(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => fields(item));
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.entries(value).flatMap(([key, child]) => [
+      key,
+      ...fields(child),
+    ]);
+  }
+  return [];
+}
+
 describe("playback event schema", () => {
   it("accepts a startup, a drm error, and a bitrate", () => {
     for (const name of ["startup.json", "drm-error.json", "bitrate.json"]) {
@@ -26,7 +39,36 @@ describe("playback event schema", () => {
       timeToFirstFrameMs: startup.startupMs,
     };
     delete renamed.startupMs;
-    expect(playbackEventErrors(renamed).length).toBeGreaterThan(0);
+    const errors = playbackEventErrors(renamed);
+    expect(errors.some((error) => error.includes("startupMs"))).toBe(true);
+    expect(errors.some((error) => error.includes("timeToFirstFrameMs"))).toBe(
+      true,
+    );
+  });
+
+  it("omits stallMs when a stall starts and requires it when the stall ends", () => {
+    const envelope = {
+      version: 1,
+      titleId: "playpath-bars",
+      sessionId: "8f0c",
+      platform: "web",
+      engine: "shaka",
+      event: "stalled",
+      at: "2026-10-04T12:00:00Z",
+      positionMs: 0,
+    };
+    expect(
+      playbackEventErrors({ ...envelope, started: true }),
+    ).toEqual([]);
+    expect(
+      playbackEventErrors({ ...envelope, started: true, stallMs: 10 }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      playbackEventErrors({ ...envelope, started: false }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      playbackEventErrors({ ...envelope, started: false, stallMs: 10 }),
+    ).toEqual([]);
   });
 
   it("rejects a field that is not in the document", () => {
@@ -61,12 +103,9 @@ describe("playback event schema", () => {
     for (const name of names) {
       const text = readFileSync(join(fixturesDir, name), "utf8");
       expect(text, name).not.toContain("ffefcdab");
-      const event = JSON.parse(text) as Record<string, unknown>;
-      for (const field of Object.keys(event)) {
-        expect(
-          ["license", "credential", "spc", "ckc", "contentKey"],
-          name,
-        ).not.toContain(field);
+      const forbidden = ["license", "credential", "spc", "ckc", "contentkey"];
+      for (const field of fields(JSON.parse(text) as unknown)) {
+        expect(forbidden, name).not.toContain(field.toLowerCase());
       }
     }
   });
