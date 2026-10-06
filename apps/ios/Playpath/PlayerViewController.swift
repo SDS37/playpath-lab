@@ -32,9 +32,13 @@ final class PlayerViewController: UIViewController {
         }
         session.onSnapshot = { [weak self] snapshot in
             self?.controls.apply(snapshot)
+            self?.showCaption(snapshot.caption)
         }
         controls.onPlay = { [weak self] in
             self?.session.play()
+        }
+        controls.onCaptions = { [weak self] enabled in
+            self?.session.setCaptions(enabled)
         }
         controls.onPause = { [weak self] in
             self?.session.pause()
@@ -61,6 +65,11 @@ final class PlayerViewController: UIViewController {
         }
     }
 
+    private func showCaption(_ text: String) {
+        videoView.showCaption(text)
+        videoView.accessibilityValue = text.isEmpty ? nil : text
+    }
+
     override var preferredStatusBarStyle: UIStatusBarStyle {
         .lightContent
     }
@@ -68,11 +77,54 @@ final class PlayerViewController: UIViewController {
 
 /// Hosts the `AVPlayerLayer` that shows frames. Transport controls stay off.
 private final class PlayerLayerView: UIView {
+    private let captionLabel = UILabel()
+
     override class var layerClass: AnyClass {
         AVPlayerLayer.self
     }
 
     var playerLayer: AVPlayerLayer? {
         layer as? AVPlayerLayer
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        captionLabel.textColor = PlayerColors.text
+        captionLabel.backgroundColor = PlayerColors.background.withAlphaComponent(0.72)
+        captionLabel.textAlignment = .center
+        captionLabel.numberOfLines = 0
+        captionLabel.font = .preferredFont(forTextStyle: .title3)
+        captionLabel.isHidden = true
+        captionLabel.isUserInteractionEnabled = false
+        addSubview(captionLabel)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) is not used")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        guard let videoRect = playerLayer?.videoRect, !videoRect.isEmpty, !captionLabel.isHidden else {
+            return
+        }
+        let inset: CGFloat = 12
+        let maxWidth = max(0, videoRect.width - inset * 2)
+        let fitted = captionLabel.sizeThatFits(CGSize(width: maxWidth, height: videoRect.height))
+        let width = min(fitted.width, maxWidth)
+        let height = min(fitted.height, videoRect.height)
+        captionLabel.frame = CGRect(
+            x: videoRect.midX - width / 2,
+            y: videoRect.maxY - height - inset,
+            width: width,
+            height: height
+        )
+    }
+
+    func showCaption(_ text: String) {
+        captionLabel.text = text
+        captionLabel.isHidden = text.isEmpty
+        setNeedsLayout()
     }
 }

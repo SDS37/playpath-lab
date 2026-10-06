@@ -2,6 +2,7 @@ package lab.playpath.player
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -13,6 +14,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import java.util.Locale
 
 @Composable
@@ -21,6 +23,7 @@ fun PlaybackControls(
     onPlay: () -> Unit,
     onPause: () -> Unit,
     onSeek: (Long) -> Unit,
+    onCaptions: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val showPause = state.playbackState == PlaybackState.Playing ||
@@ -34,11 +37,24 @@ fun PlaybackControls(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(spacing.bar),
     ) {
-        Button(onClick = if (showPause) onPause else onPlay) {
-            Text(
-                text = if (showPause) "Pause" else "Play",
-                style = MaterialTheme.typography.labelLarge,
-            )
+        Row(horizontalArrangement = Arrangement.spacedBy(spacing.bar)) {
+            Button(onClick = if (showPause) onPause else onPlay) {
+                Text(
+                    text = if (showPause) "Pause" else "Play",
+                    style = MaterialTheme.typography.labelLarge,
+                )
+            }
+            Button(
+                onClick = { onCaptions(!state.captions) },
+                modifier = Modifier.semantics {
+                    stateDescription = if (state.captions) "on" else "off"
+                },
+            ) {
+                Text(
+                    text = "Captions",
+                    style = MaterialTheme.typography.labelLarge,
+                )
+            }
         }
         Slider(
             value = position,

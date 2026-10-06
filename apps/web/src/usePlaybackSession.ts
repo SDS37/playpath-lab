@@ -13,6 +13,7 @@ export function usePlaybackSession(
   play: () => void;
   pause: () => void;
   seek: (positionMs: number) => void;
+  setCaptions: (enabled: boolean) => void;
 } {
   const sessionRef = useRef<PlaybackSession | null>(null);
   const chainRef = useRef<Promise<void>>(Promise.resolve());
@@ -72,6 +73,9 @@ export function usePlaybackSession(
     },
     seek: (positionMs: number) => {
       sessionRef.current?.seek(positionMs);
+    },
+    setCaptions: (enabled: boolean) => {
+      sessionRef.current?.setCaptions(enabled);
     },
   };
 }

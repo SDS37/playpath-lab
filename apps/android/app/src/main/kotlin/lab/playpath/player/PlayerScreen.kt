@@ -90,6 +90,7 @@ fun PlayerScreen() {
             onPlay = session::play,
             onPause = session::pause,
             onSeek = session::seek,
+            onCaptions = session::setCaptions,
         )
         val error = state.error
         if (error != null) {
