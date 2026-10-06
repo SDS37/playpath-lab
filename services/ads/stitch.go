@@ -62,11 +62,26 @@ func New(filmDir, prerollDir, originBase, adsBase string) (*Server, error) {
 		}
 		return nil, err
 	}
-	if _, err := os.Stat(filepath.Join(pre, "creative.mp4")); err != nil {
-		if os.IsNotExist(err) {
+	for _, rel := range []string{
+		"creative.mp4",
+		filepath.Join("720p", "init.mp4"),
+		filepath.Join("720p", "seg_0.m4s"),
+		filepath.Join("1080p", "init.mp4"),
+		filepath.Join("1080p", "seg_0.m4s"),
+		filepath.Join("audio", "init.mp4"),
+		filepath.Join("audio", "seg_0.m4s"),
+		filepath.Join("subtitles", "preroll.vtt"),
+	} {
+		info, err := os.Stat(filepath.Join(pre, rel))
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil, errNoPreroll
+			}
+			return nil, err
+		}
+		if !info.Mode().IsRegular() {
 			return nil, errNoPreroll
 		}
-		return nil, err
 	}
 	origin, err := absoluteBase(originBase)
 	if err != nil {
@@ -184,7 +199,7 @@ func (s *Server) stitchMedia(rendition string) (string, error) {
 		return "", errors.New("film playlist is missing")
 	}
 	if rendition == "subtitles" {
-		return s.stitchSubtitles(string(raw)), nil
+		return s.stitchSubtitles(string(raw))
 	}
 	mapURI, keyLine, segments, err := parseMedia(string(raw))
 	if err != nil {
@@ -194,15 +209,7 @@ func (s *Server) stitchMedia(rendition string) (string, error) {
 	if rendition == "audio" {
 		lead = s.audio
 	}
-	target := 6
-	if ceilSeconds(lead) > target {
-		target = ceilSeconds(lead)
-	}
-	for _, seg := range segments {
-		if ceilSeconds(seg.duration) > target {
-			target = ceilSeconds(seg.duration)
-		}
-	}
+	target := playlistTarget(lead, segments)
 	var b strings.Builder
 	fmt.Fprintf(&b, "#EXTM3U\n#EXT-X-VERSION:7\n#EXT-X-TARGETDURATION:%d\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXT-X-INDEPENDENT-SEGMENTS\n", target)
 	fmt.Fprintf(&b, "#EXT-X-MAP:URI=%q\n", s.adsBase+"/preroll/"+rendition+"/init.mp4")
@@ -221,21 +228,21 @@ func (s *Server) stitchMedia(rendition string) (string, error) {
 	return b.String(), nil
 }
 
-func (s *Server) stitchSubtitles(raw string) string {
+func (s *Server) stitchSubtitles(raw string) (string, error) {
 	_, _, segments, err := parseMedia(raw)
-	film := s.originBase + "/subtitles/playpath-bars.vtt"
-	filmDur := 60.0
-	if err == nil && len(segments) > 0 {
-		film = s.originJoin("subtitles", segments[0].uri)
-		filmDur = segments[0].duration
+	if err != nil {
+		return "", err
 	}
+	film := s.originJoin("subtitles", segments[0].uri)
+	filmDur := segments[0].duration
+	target := playlistTarget(s.video, segments[:1])
 	var b strings.Builder
-	b.WriteString("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:60\n#EXT-X-PLAYLIST-TYPE:VOD\n")
+	fmt.Fprintf(&b, "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:%d\n#EXT-X-PLAYLIST-TYPE:VOD\n", target)
 	fmt.Fprintf(&b, "#EXTINF:%.6f,\n%s\n", s.video, s.adsBase+"/preroll/subtitles/preroll.vtt")
 	b.WriteString("#EXT-X-DISCONTINUITY\n")
 	fmt.Fprintf(&b, "#EXTINF:%.6f,\n%s\n", filmDur, film)
 	b.WriteString("#EXT-X-ENDLIST\n")
-	return b.String()
+	return b.String(), nil
 }
 
 func (s *Server) stitchDASH() (string, error) {
@@ -304,7 +311,7 @@ func (s *Server) servePreroll(w http.ResponseWriter, r *http.Request) {
 	}
 	cleaned := path.Clean("/" + rel)
 	name := strings.TrimPrefix(cleaned, "/")
-	if name == "" || path.Base(name) == "duration.txt" || path.Base(name) == "lab-key.json" || path.Base(name) == "playpath-bars.mp4" {
+	if name == "" || prerollHidden(name) {
 		http.NotFound(w, r)
 		return
 	}
@@ -501,6 +508,28 @@ func ceilSeconds(seconds float64) int {
 		return n + 1
 	}
 	return n
+}
+
+func playlistTarget(lead float64, segments []segment) int {
+	target := 6
+	if ceilSeconds(lead) > target {
+		target = ceilSeconds(lead)
+	}
+	for _, seg := range segments {
+		if ceilSeconds(seg.duration) > target {
+			target = ceilSeconds(seg.duration)
+		}
+	}
+	return target
+}
+
+func prerollHidden(name string) bool {
+	switch strings.ToLower(path.Base(name)) {
+	case "duration.txt", "lab-key.json", "playpath-bars.mp4":
+		return true
+	default:
+		return false
+	}
 }
 
 func contentType(name string) string {

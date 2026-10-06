@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -200,6 +201,103 @@ func TestPrerollFile(t *testing.T) {
 	}
 }
 
+func TestSubtitleTargetFollowsFilm(t *testing.T) {
+	handler := fixture(t)
+	body, err := handler.stitchMedia("subtitles")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(body, "#EXT-X-TARGETDURATION:60\n") {
+		t.Fatalf("target %s", body)
+	}
+	mustWrite(t, filepath.Join(handler.filmDir, "subtitles", "media.m3u8"), []byte("#EXTM3U\n#EXTINF:60.400000,\nplaypath-bars.vtt\n#EXT-X-ENDLIST\n"))
+	body, err = handler.stitchMedia("subtitles")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(body, "#EXT-X-TARGETDURATION:61\n") || !strings.Contains(body, "#EXTINF:60.400000,\n") {
+		t.Fatalf("target %s", body)
+	}
+}
+
+func TestBrokenSubtitlePlaylistIsNotServed(t *testing.T) {
+	handler := fixture(t)
+	mustWrite(t, filepath.Join(handler.filmDir, "subtitles", "media.m3u8"), []byte("#EXTM3U\n#EXT-X-ENDLIST\n"))
+	if _, err := handler.stitchMedia("subtitles"); err == nil {
+		t.Fatal("a subtitle playlist with no cue was accepted")
+	}
+	srv := httptest.NewServer(handler)
+	t.Cleanup(srv.Close)
+	resp := get(t, srv.URL+"/ssai/hls/subtitles/media.m3u8")
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status %d", resp.StatusCode)
+	}
+}
+
+func TestPrerollHiddenNames(t *testing.T) {
+	for _, name := range []string{"duration.txt", "Duration.txt", "LAB-KEY.JSON", "Playpath-bars.mp4"} {
+		if !prerollHidden(name) {
+			t.Fatalf("%s should be hidden", name)
+		}
+	}
+	if prerollHidden("creative.mp4") || prerollHidden("720p/seg_0.m4s") {
+		t.Fatal("a pre-roll segment was hidden")
+	}
+	handler := fixture(t)
+	mustWrite(t, filepath.Join(handler.prerollDir, "lab-key.json"), []byte(`{"key":"secret"}`))
+	mustWrite(t, filepath.Join(handler.prerollDir, "playpath-bars.mp4"), []byte("mezzanine"))
+	srv := httptest.NewServer(handler)
+	t.Cleanup(srv.Close)
+	for _, path := range []string{"/preroll/Duration.txt", "/preroll/LAB-KEY.JSON", "/preroll/PLAYPATH-BARS.MP4"} {
+		resp := get(t, srv.URL+path)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if resp.StatusCode != http.StatusNotFound {
+			t.Fatalf("%s status %d", path, resp.StatusCode)
+		}
+		if strings.Contains(string(body), "secret") || strings.Contains(string(body), "video=") || strings.Contains(string(body), "mezzanine") {
+			t.Fatalf("%s leaked a hidden file: %s", path, body)
+		}
+	}
+}
+
+func TestNewRejectsPartialPreroll(t *testing.T) {
+	handler := fixture(t)
+	missing := []string{
+		filepath.Join(handler.prerollDir, "720p", "seg_0.m4s"),
+		filepath.Join(handler.prerollDir, "audio", "init.mp4"),
+		filepath.Join(handler.prerollDir, "subtitles", "preroll.vtt"),
+		filepath.Join(handler.prerollDir, "creative.mp4"),
+	}
+	for _, file := range missing {
+		if err := os.Remove(file); err != nil {
+			t.Fatal(err)
+		}
+		_, err := New(handler.filmDir, handler.prerollDir, "http://127.0.0.1:8080", "http://127.0.0.1:8083")
+		if !errors.Is(err, errNoPreroll) {
+			t.Fatalf("remove %s: %v", file, err)
+		}
+		mustWrite(t, file, []byte("restored"))
+	}
+}
+
+func TestNewRejectsPrerollDirectory(t *testing.T) {
+	handler := fixture(t)
+	file := filepath.Join(handler.prerollDir, "creative.mp4")
+	if err := os.Remove(file); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(file, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_, err := New(handler.filmDir, handler.prerollDir, "http://127.0.0.1:8080", "http://127.0.0.1:8083")
+	if !errors.Is(err, errNoPreroll) {
+		t.Fatalf("directory creative: %v", err)
+	}
+}
+
 func fixture(t *testing.T) *Server {
 	t.Helper()
 	root := t.TempDir()
@@ -238,7 +336,10 @@ seg_9.m4s
 	mustWrite(t, filepath.Join(pre, "720p", "seg_0.m4s"), []byte("ad"))
 	mustWrite(t, filepath.Join(pre, "720p", "init.mp4"), []byte("init"))
 	mustWrite(t, filepath.Join(pre, "1080p", "seg_0.m4s"), []byte("ad"))
+	mustWrite(t, filepath.Join(pre, "1080p", "init.mp4"), []byte("init"))
 	mustWrite(t, filepath.Join(pre, "audio", "seg_0.m4s"), []byte("tone"))
+	mustWrite(t, filepath.Join(pre, "audio", "init.mp4"), []byte("ainit"))
+	mustWrite(t, filepath.Join(pre, "subtitles", "preroll.vtt"), []byte("WEBVTT\n"))
 	handler, err := New(film, pre, "http://127.0.0.1:8080", "http://127.0.0.1:8083")
 	if err != nil {
 		t.Fatal(err)

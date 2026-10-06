@@ -37,11 +37,14 @@ if [[ ! -f "${key_file}" ]]; then
   exit 1
 fi
 
-rm -rf "${out}"
-mkdir -p "${out}"
-cp -R "${clear}/." "${out}/"
+# Publish only after encryption and the checks below succeed. A failed run
+# must not replace the protected package.
+work="${out}.tmp"
+rm -rf "${work}"
+mkdir -p "${work}"
+cp -R "${clear}/." "${work}/"
 
-python3 - "${clear}" "${out}" "${key_file}" <<'PY'
+if ! python3 - "${clear}" "${work}" "${key_file}" <<'PY'
 import json
 import re
 import shutil
@@ -73,6 +76,24 @@ CONTAINERS = {
 def fail(message):
     print(message, file=sys.stderr)
     sys.exit(1)
+
+
+def require_init(directory):
+    # A variant stream map makes ffmpeg write init_<index>.mp4 even when
+    # hls.sh asks for init.mp4. The media playlist records the real name.
+    playlist = directory / "media.m3u8"
+    name = ""
+    if playlist.is_file():
+        for line in playlist.read_text().splitlines():
+            if line.startswith("#EXT-X-MAP:") and 'URI="' in line:
+                name = line.split('URI="', 1)[1].split('"', 1)[0]
+                break
+    if not name or "/" in name or "\\" in name or name.startswith("."):
+        fail(f"{directory.name} has no init segment.")
+    path = directory / name
+    if not path.is_file():
+        fail(f"{directory.name} has no init segment.")
+    return path
 
 
 def box_size(data, at):
@@ -646,11 +667,11 @@ tracks = {
     "audio": (3, False),
 }
 for folder, (salt, is_video) in tracks.items():
-    init_name = next((out / folder).glob("init_*.mp4")).name
-    original = encrypt_init(out / folder / init_name, kid)
+    init_path = require_init(out / folder)
+    original = encrypt_init(init_path, kid)
     length_size = None
     if is_video:
-        clear_init = (clear / folder / init_name).read_bytes()
+        clear_init = require_init(clear / folder).read_bytes()
         stsd = require_box(clear_init, b"stsd")
         entry_at = stsd + 16
         entry = clear_init[entry_at : entry_at + box_size(clear_init, entry_at)]
@@ -691,25 +712,34 @@ if "EXT-X-KEY" in (out / "subtitles" / "media.m3u8").read_text():
     fail("The subtitle playlist names a key.")
 
 for folder in tracks:
-    init_name = next((clear / folder).glob("init_*.mp4")).name
-    if b"tenc" in (clear / folder / init_name).read_bytes():
+    if b"tenc" in require_init(clear / folder).read_bytes():
         fail("Encryption changed the clear init segment.")
 
-player_check(next((out / "720p").glob("init_*.mp4")), next((out / "720p").glob("seg_0.m4s")), key, "video", "0:v:0")
-player_check(next((out / "audio").glob("init_*.mp4")), next((out / "audio").glob("seg_0.m4s")), key, "audio", "0:a:0")
+player_check(require_init(out / "720p"), next((out / "720p").glob("seg_0.m4s")), key, "video", "0:v:0")
+player_check(require_init(out / "audio"), next((out / "audio").glob("seg_0.m4s")), key, "audio", "0:a:0")
 
 print(f"Key id: {kid.hex()}")
 print("Key system: org.w3.clearkey")
 PY
-
+then
+  rm -rf "${work}"
+  exit 1
+fi
 shopt -s nullglob
 playlists=("${master_dir}"/*.m3u8 "${master_dir}"/*.mpd "${master_dir}"/*.m4s "${master_dir}"/*.ts)
 if ((${#playlists[@]} > 0)); then
+  rm -rf "${work}"
   echo "Encryption wrote a playlist or a segment into the master directory." >&2
   printf '%s\n' "${playlists[@]}" >&2
   exit 1
 fi
 
-"${root}/pipeline/timelines.sh"
+if ! "${root}/pipeline/timelines.sh"; then
+  rm -rf "${work}"
+  exit 1
+fi
+
+rm -rf "${out}"
+mv "${work}" "${out}"
 
 echo "Title id: ${title}"
