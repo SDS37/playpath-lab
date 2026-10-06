@@ -5,9 +5,16 @@ type ControlsProps = {
   onPlay: () => void;
   onPause: () => void;
   onSeek: (positionMs: number) => void;
+  onCaptions: (enabled: boolean) => void;
 };
 
-export function Controls({ snapshot, onPlay, onPause, onSeek }: ControlsProps) {
+export function Controls({
+  snapshot,
+  onPlay,
+  onPause,
+  onSeek,
+  onCaptions,
+}: ControlsProps) {
   const showPause =
     snapshot.playbackState === "playing" ||
     snapshot.playbackState === "seeking";
@@ -29,6 +36,16 @@ export function Controls({ snapshot, onPlay, onPause, onSeek }: ControlsProps) {
         onClick={showPause ? onPause : onPlay}
       >
         {showPause ? "Pause" : "Play"}
+      </button>
+      <button
+        type="button"
+        className="control"
+        aria-pressed={snapshot.captions}
+        onClick={() => {
+          onCaptions(!snapshot.captions);
+        }}
+      >
+        Captions
       </button>
       <input
         className="control seek"

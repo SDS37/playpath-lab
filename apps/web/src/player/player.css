@@ -16,11 +16,22 @@ body {
   margin: 0;
 }
 
+.picture-frame {
+  position: relative;
+  width: 100%;
+  max-width: 64rem;
+}
+
 .picture {
   display: block;
   width: 100%;
-  max-width: 64rem;
   background: var(--background);
+}
+
+.shaka-text-container {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
 .menus {

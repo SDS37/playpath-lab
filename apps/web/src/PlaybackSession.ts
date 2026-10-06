@@ -27,6 +27,7 @@ export type PlaybackSnapshot = {
   durationMs: number;
   height: number | undefined;
   bandwidthBps: number | undefined;
+  captions: boolean;
   error: string | undefined;
 };
 
@@ -52,6 +53,7 @@ export const initialSnapshot: PlaybackSnapshot = {
   durationMs: 0,
   height: undefined,
   bandwidthBps: undefined,
+  captions: true,
   error: undefined,
 };
 
@@ -74,6 +76,7 @@ export class PlaybackSession {
   #creativeAssigned = false;
   #creativeStarted = false;
   #playWhenReady = false;
+  #captions = true;
   #loadStartedMs = 0;
   #firstFrameMs: number | undefined = undefined;
   #startupLogged = false;
@@ -136,6 +139,12 @@ export class PlaybackSession {
     }
     this.#fail(this.#video.error);
   };
+  #onTextTrack = (): void => {
+    if (this.#engine !== "native" || this.#adPhase === "creative") {
+      return;
+    }
+    this.#applyCaptions();
+  };
   #onNativeResize = (): void => {
     if (!this.#native || this.#nativeGeneration !== this.#generation) {
       return;
@@ -184,7 +193,7 @@ export class PlaybackSession {
     if (generation !== this.#generation) {
       return;
     }
-    this.#set({ ...initialSnapshot });
+    this.#set({ ...initialSnapshot, captions: this.#captions });
     await this.#readCue(generation);
     if (generation !== this.#generation) {
       return;
@@ -229,7 +238,15 @@ export class PlaybackSession {
       if (generation !== this.#generation) {
         return;
       }
+      const frame = this.#video.parentElement;
+      player.setVideoContainer(frame);
       const applied = player.configure({
+        textDisplayFactory: (
+          active: shaka.Player,
+        ): shaka.extern.TextDisplayer =>
+          frame === null
+            ? new shaka.text.NativeTextDisplayer(active)
+            : new shaka.text.UITextDisplayer(active),
         drm: {
           servers: {
             ...drmServers(),
@@ -295,6 +312,7 @@ export class PlaybackSession {
         return;
       }
       this.#noteShaka(player);
+      this.#applyCaptions();
       this.#publishFromVideo();
     } catch (err) {
       if (generation !== this.#generation) {
@@ -324,6 +342,12 @@ export class PlaybackSession {
       return;
     }
     this.#video.currentTime = positionMs / 1000;
+  }
+
+  setCaptions(enabled: boolean): void {
+    this.#captions = enabled;
+    this.#applyCaptions();
+    this.#set({ ...this.#snapshot, captions: enabled });
   }
 
   async destroy(): Promise<void> {
@@ -356,9 +380,16 @@ export class PlaybackSession {
       }
       this.#noteRendition("hlsjs", level.height, level.bitrate, level.codecs);
     });
+    hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
+      if (generation !== this.#generation || this.#adPhase === "creative") {
+        return;
+      }
+      this.#applyCaptions();
+    });
     hls.loadSource(manifestUrl);
     hls.attachMedia(this.#video);
     this.#bindVideo();
+    this.#applyCaptions();
   }
 
   #loadNativeHls(manifestUrl: string, generation: number): void {
@@ -367,8 +398,63 @@ export class PlaybackSession {
     this.#nativeGeneration = generation;
     this.#video.addEventListener("error", this.#onNativeError);
     this.#video.addEventListener("resize", this.#onNativeResize);
+    this.#video.textTracks.addEventListener("addtrack", this.#onTextTrack);
     this.#video.src = manifestUrl;
     this.#bindVideo();
+    this.#applyCaptions();
+  }
+
+  #applyCaptions(): void {
+    if (this.#adPhase === "creative") {
+      return;
+    }
+    const player = this.#player;
+    if (player !== null) {
+      if (!this.#captions) {
+        player.selectTextTrack(null);
+        return;
+      }
+      const tracks = player.getTextTracks();
+      const track =
+        tracks.find(
+          (item) => item.language === "en" || item.language === "eng",
+        ) ?? tracks[0];
+      if (track !== undefined) {
+        player.selectTextTrack(track);
+      }
+      return;
+    }
+    const hls = this.#hls;
+    if (hls !== null) {
+      hls.subtitleDisplay = this.#captions;
+      if (!this.#captions) {
+        hls.subtitleTrack = -1;
+        return;
+      }
+      const english = hls.subtitleTracks.findIndex(
+        (item) =>
+          item.lang === "en" || item.lang === "eng" || item.name === "English",
+      );
+      if (hls.subtitleTracks.length > 0) {
+        hls.subtitleTrack = english >= 0 ? english : 0;
+      }
+      return;
+    }
+    if (!this.#native) {
+      return;
+    }
+    const mode = this.#captions ? "showing" : "disabled";
+    const tracks = this.#video.textTracks;
+    for (let index = 0; index < tracks.length; index += 1) {
+      const track = tracks[index];
+      if (track === undefined) {
+        continue;
+      }
+      if (track.kind !== "subtitles" && track.kind !== "captions") {
+        continue;
+      }
+      track.mode = mode;
+    }
   }
 
   async #releasePlayer(): Promise<void> {
@@ -387,6 +473,7 @@ export class PlaybackSession {
     if (this.#native) {
       this.#video.removeEventListener("error", this.#onNativeError);
       this.#video.removeEventListener("resize", this.#onNativeResize);
+      this.#video.textTracks.removeEventListener("addtrack", this.#onTextTrack);
       this.#native = false;
       this.#video.removeAttribute("src");
       this.#video.load();
@@ -671,6 +758,9 @@ export class PlaybackSession {
         }
         this.#video.currentTime = cueSec;
         restored = true;
+      }
+      if (restored && generation === this.#generation) {
+        this.#applyCaptions();
       }
       if (!restored || generation !== this.#generation) {
         this.#unlockAd(generation);

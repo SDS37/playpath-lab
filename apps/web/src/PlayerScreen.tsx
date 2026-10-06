@@ -21,7 +21,7 @@ const menuLabels: Record<MenuName, string> = {
 export function PlayerScreen() {
   const [video, setVideo] = useState<HTMLVideoElement | null>(null);
   const [menu, setMenu] = useState<MenuName>("dash");
-  const { snapshot, play, pause, seek } = usePlaybackSession(
+  const { snapshot, play, pause, seek, setCaptions } = usePlaybackSession(
     video,
     menus[menu],
   );
@@ -44,12 +44,15 @@ export function PlayerScreen() {
           </button>
         ))}
       </div>
-      <video ref={setVideo} className="picture" playsInline />
+      <div className="picture-frame">
+        <video ref={setVideo} className="picture" playsInline />
+      </div>
       <Controls
         snapshot={snapshot}
         onPlay={play}
         onPause={pause}
         onSeek={seek}
+        onCaptions={setCaptions}
       />
     </main>
   );
