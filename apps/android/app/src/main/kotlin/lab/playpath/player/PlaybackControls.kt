@@ -9,6 +9,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
@@ -27,6 +28,7 @@ fun PlaybackControls(
     val duration = state.durationMs.coerceAtLeast(0)
     val rangeEnd = if (duration > 0) duration.toFloat() else 1f
     val position = state.positionMs.coerceIn(0, rangeEnd.toLong()).toFloat()
+    val seekEnabled = !state.adPlaying && duration > 0
     val spacing = LocalPlaypathSpacing.current
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -46,10 +48,12 @@ fun PlaybackControls(
                 }
             },
             valueRange = 0f..rangeEnd,
-            enabled = !state.adPlaying && duration > 0,
-            modifier = Modifier.semantics(mergeDescendants = true) {
-                contentDescription = "Seek"
-                if (state.adPlaying || duration == 0L) {
+            enabled = seekEnabled,
+            modifier = if (seekEnabled) {
+                Modifier.semantics { contentDescription = "Seek" }
+            } else {
+                Modifier.clearAndSetSemantics {
+                    contentDescription = "Seek"
                     disabled()
                 }
             },

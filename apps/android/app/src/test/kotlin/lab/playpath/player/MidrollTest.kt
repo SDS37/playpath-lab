@@ -31,4 +31,12 @@ class MidrollTest {
         assertFalse(playingAtCue(9_000, 10_000, paused = false, ended = false))
         assertFalse(playingAtCue(10_000, 10_000, paused = false, ended = true))
     }
+
+    @Test
+    fun `the film is back only once it reaches the cue`() {
+        assertFalse(resumedAtCue(0, 10_000))
+        assertFalse(resumedAtCue(8_000, 10_000))
+        assertTrue(resumedAtCue(9_200, 10_000))
+        assertTrue(resumedAtCue(10_000, 10_000))
+    }
 }

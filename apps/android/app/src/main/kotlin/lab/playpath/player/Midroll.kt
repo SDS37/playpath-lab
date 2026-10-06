@@ -33,6 +33,10 @@ fun readMidroll(xml: String): Midroll? {
     )
 }
 
+fun resumedAtCue(positionMs: Long, cueMs: Long): Boolean {
+    return positionMs + 1_000 >= cueMs
+}
+
 fun playingAtCue(
     currentTimeMs: Long,
     cueMs: Long,

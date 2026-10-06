@@ -158,6 +158,9 @@ class PlaybackSession(
         }
         if (player.playbackState == Player.STATE_ENDED) {
             player.seekTo(0)
+            player.play()
+            publish()
+            return
         }
         player.play()
         publish()
@@ -240,12 +243,12 @@ class PlaybackSession(
                 creativeStarted = true
             } else if (adPhase == AdPhase.Resume) {
                 val cue = filmCueMs
-                if (cue != null && !filmCueSeeked && player.currentPosition + 1_000 < cue) {
-                    filmCueSeeked = true
-                    player.seekTo(cue)
-                } else {
+                if (cue == null || resumedAtCue(player.currentPosition, cue)) {
                     filmCueMs = null
                     adPhase = AdPhase.Off
+                } else if (!filmCueSeeked) {
+                    filmCueSeeked = true
+                    player.seekTo(cue)
                 }
             }
         }
@@ -283,8 +286,10 @@ class PlaybackSession(
     }
 
     override fun onPlayerError(error: PlaybackException) {
-        if (adPhase == AdPhase.Creative && creativeAssigned) {
-            scope.launch { resumeFilm() }
+        if (adPhase == AdPhase.Creative) {
+            if (creativeFailure()) {
+                scope.launch { resumeFilm() }
+            }
             return
         }
         if (adPhase == AdPhase.Resume) {
@@ -303,6 +308,9 @@ class PlaybackSession(
         eventTime: AnalyticsListener.EventTime,
         error: Exception,
     ) {
+        if (adPhase == AdPhase.Creative) {
+            return
+        }
         val playback = error as? PlaybackException
         val code = when {
             playback != null && playback.errorCode in DRM_ERROR_FIRST..DRM_ERROR_LAST ->
@@ -409,6 +417,14 @@ class PlaybackSession(
         }
     }
 
+    private fun creativeFailure(): Boolean {
+        if (!creativeAssigned) {
+            return false
+        }
+        val current = player.currentMediaItem?.localConfiguration?.uri?.toString()
+        return current == null || current == creativeUrl
+    }
+
     private fun atCue(): Boolean {
         val cue = cueMs
         if (creativeUrl == null || cue == null || adPlayed || adPhase != AdPhase.Off) {
@@ -438,8 +454,8 @@ class PlaybackSession(
             .setMimeType(MimeTypes.VIDEO_MP4)
             .build()
         player.stop()
-        creativeAssigned = true
         player.setMediaSource(ProgressiveMediaSource.Factory(httpFactory).createMediaSource(item))
+        creativeAssigned = true
         player.prepare()
         player.play()
         scope.launch {
