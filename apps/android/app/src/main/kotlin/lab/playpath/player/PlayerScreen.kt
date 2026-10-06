@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -22,6 +23,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 private val ScreenPadding = 12.dp
 
@@ -33,25 +37,43 @@ fun PlayerScreen() {
     val session = remember {
         PlaybackSession(context) { next -> state = next }
     }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, session) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                session.pause()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     DisposableEffect(session) {
         onDispose { session.release() }
     }
     LaunchedEffect(manifestUrl) {
         session.load(manifestUrl)
     }
+    val selectManifest = { url: String ->
+        if (url == manifestUrl) {
+            session.load(url)
+        } else {
+            manifestUrl = url
+        }
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .safeDrawingPadding()
             .padding(ScreenPadding),
     ) {
         MenuButton(
             label = "DASH",
-            onClick = { manifestUrl = DASH_MANIFEST },
+            onClick = { selectManifest(DASH_MANIFEST) },
         )
         MenuButton(
             label = "Wrong key",
-            onClick = { manifestUrl = WRONG_KEY_MANIFEST },
+            onClick = { selectManifest(WRONG_KEY_MANIFEST) },
         )
         AndroidView(
             factory = { viewContext -> session.createSurface(viewContext) },

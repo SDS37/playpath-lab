@@ -20,7 +20,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -n lab.playpath.player/.MainActivity
 ```
 
-DASH loads `http://127.0.0.1:8080/manifest.mpd`. `PlaybackSession` builds an `ExoPlayer`, sets that DASH `MediaItem`, and opens a `DefaultDrmSessionManager` for `org.w3.clearkey` at `http://127.0.0.1:8082/`. The license log shows `POST / 200` and the lab key id. The Compose screen shows the picture. Play and pause go through the session. The session does not choose a rung. The stock `PlayerView` bar is off. Leaving the screen releases the player.
+DASH loads `http://127.0.0.1:8080/manifest.mpd`. `PlaybackSession` builds an `ExoPlayer`, sets that DASH `MediaItem`, and opens a `DefaultDrmSessionManager` for `org.w3.clearkey` at `http://127.0.0.1:8082/`. The license log shows `POST / 200` and the lab key id. The Compose screen shows the picture. Play and pause go through the session. Play after the title ends seeks to the start. Play after an error, and choosing the menu that is already selected, loads that menu again. The session does not choose a rung. The stock `PlayerView` bar is off. Stopping the activity pauses playback. Leaving the screen releases the player.
 
 Wrong key loads `http://127.0.0.1:8080/manifest-wrong-kid.mpd`. The license log shows `POST / 403` and the other key id, and it does not log the key. The picture stays black. The screen says the title cannot be played. Logcat tag `playpath.event` contains one JSON object per DRM result, including `event: "drm"`, `result: "error"`, and `code: "ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED"`. The app does not load the clear package.
 

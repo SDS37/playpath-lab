@@ -41,6 +41,7 @@ class PlaybackSession(
     private var sessionId = ""
     private var drmReported = false
     private var drmCode: String? = null
+    private var manifestUrl: String? = null
     private var released = false
 
     init {
@@ -80,6 +81,7 @@ class PlaybackSession(
         seeking = false
         drmReported = false
         drmCode = null
+        this.manifestUrl = manifestUrl
         snapshot = PlaybackUiState()
         publish()
         val item = MediaItem.Builder()
@@ -99,6 +101,14 @@ class PlaybackSession(
     fun play() {
         if (released) {
             return
+        }
+        val manifest = manifestUrl
+        if (player.playerError != null && manifest != null) {
+            load(manifest)
+            return
+        }
+        if (player.playbackState == Player.STATE_ENDED) {
+            player.seekTo(0)
         }
         player.play()
         publish()
