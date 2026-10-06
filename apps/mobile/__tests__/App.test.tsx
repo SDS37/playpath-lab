@@ -7,6 +7,8 @@ test("renders the title and the play control", async () => {
   await ReactTestRenderer.act(() => {
     renderer = ReactTestRenderer.create(<App />);
   });
-  expect(renderer!.root.findByProps({ accessibilityLabel: "playpath-bars" })).toBeTruthy();
+  expect(renderer!.root.findByProps({ testID: "player" }).props.accessibilityLabel).toBe(
+    "playpath-bars",
+  );
   expect(renderer!.root.findByProps({ accessibilityLabel: "Play" })).toBeTruthy();
 });

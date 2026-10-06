@@ -54,6 +54,7 @@ export const PlayerSurface = forwardRef<PlayerCommands, PlayerSurfaceProps>(
     return (
       <NativePlayer
         ref={nativeRef}
+        accessibilityLabel="playpath-bars"
         style={styles.picture}
         manifestUrl={manifestUrl}
         onSnapshot={(event) => {

@@ -12,8 +12,10 @@ final class PlaypathSession: NSObject {
     private var loadedURL: String?
     private var sessionId = ""
     private var loadedAt = Date()
+    private var readyAt: Date?
     private var startupLogged = false
     private var seeking = false
+    private var seekGeneration = 0
     private var didPlayToEnd = false
     private var wantsPlayback = false
     private var failureMessage: String?
@@ -65,6 +67,7 @@ final class PlaypathSession: NSObject {
         loadedURL = manifestUrl
         sessionId = UUID().uuidString
         loadedAt = Date()
+        readyAt = nil
         startupLogged = false
         seeking = false
         didPlayToEnd = false
@@ -106,12 +109,18 @@ final class PlaypathSession: NSObject {
         guard !released else {
             return
         }
-        seeking = true
+        seekGeneration += 1
+        let generation = seekGeneration
+        didPlayToEnd = false
+        seeking = player.timeControlStatus != .paused
         let time = CMTime(value: CMTimeValue(max(0, positionMs)), timescale: 1000)
         player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
             DispatchQueue.main.async {
-                self?.seeking = false
-                self?.publish()
+                guard let self, self.seekGeneration == generation else {
+                    return
+                }
+                self.seeking = false
+                self.publish()
             }
         }
         publish()
@@ -198,6 +207,9 @@ final class PlaypathSession: NSObject {
         guard !released, item === player.currentItem else {
             return
         }
+        if item.status == .readyToPlay, readyAt == nil {
+            readyAt = Date()
+        }
         if item.status == .failed {
             failureMessage = "Playback failed."
         }
@@ -265,8 +277,12 @@ final class PlaypathSession: NSObject {
         guard !startupLogged, player.timeControlStatus == .playing, let loadedURL else {
             return
         }
+        if readyAt == nil, player.currentItem?.status == .readyToPlay {
+            readyAt = Date()
+        }
         startupLogged = true
-        let startupMs = Int(Date().timeIntervalSince(loadedAt) * 1000)
+        let frameAt = readyAt ?? Date()
+        let startupMs = Int(frameAt.timeIntervalSince(loadedAt) * 1000)
         emit(
             startupEvent(
                 sessionId: sessionId,

@@ -14,6 +14,7 @@ using namespace facebook::react;
 
 @implementation PlaypathPlayerView {
   PlaypathSession *_session;
+  NSMutableArray<NSString *> *_pendingEvents;
 }
 
 - (instancetype)init
@@ -40,6 +41,12 @@ using namespace facebook::react;
     [_session loadWithManifestUrl:url];
   }
   [super updateProps:props oldProps:oldProps];
+}
+
+- (void)updateEventEmitter:(const EventEmitter::Shared &)eventEmitter
+{
+  [super updateEventEmitter:eventEmitter];
+  [self flushPendingEvents];
 }
 
 - (void)handleCommand:(const NSString *)commandName args:(const NSArray *)args
@@ -81,11 +88,39 @@ using namespace facebook::react;
 
 - (void)emitPlaybackEvent:(NSString *)json
 {
-  if (_eventEmitter == nullptr || json == nil) {
+  if (json == nil) {
     return;
   }
-  std::string body = std::string([json UTF8String]);
-  PlaypathPlayerViewEventEmitter::OnPlaybackEvent event{body};
+  if (_eventEmitter == nullptr) {
+    if (_pendingEvents == nil) {
+      _pendingEvents = [NSMutableArray new];
+    }
+    [_pendingEvents addObject:json];
+    return;
+  }
+  [self flushPendingEvents];
+  [self sendPlaybackEvent:json];
+}
+
+- (void)flushPendingEvents
+{
+  if (_eventEmitter == nullptr || _pendingEvents.count == 0) {
+    return;
+  }
+  NSArray<NSString *> *queued = [_pendingEvents copy];
+  [_pendingEvents removeAllObjects];
+  for (NSString *json in queued) {
+    [self sendPlaybackEvent:json];
+  }
+}
+
+- (void)sendPlaybackEvent:(NSString *)json
+{
+  const char *bytes = [json UTF8String];
+  if (bytes == nullptr) {
+    return;
+  }
+  PlaypathPlayerViewEventEmitter::OnPlaybackEvent event{std::string(bytes)};
   self.eventEmitter.onPlaybackEvent(event);
 }
 

@@ -35,10 +35,7 @@ export function Controls({ snapshot, onPlay, onPause, onSeek }: ControlsProps) {
   }
 
   return (
-    <View
-      style={styles.bar}
-      accessibilityLabel="playpath-bars"
-    >
+    <View style={styles.bar}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={showPause ? "Pause" : "Play"}

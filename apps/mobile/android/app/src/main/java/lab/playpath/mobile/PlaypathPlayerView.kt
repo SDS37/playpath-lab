@@ -30,6 +30,7 @@ import com.facebook.react.bridge.WritableMap
 import com.facebook.react.uimanager.UIManagerHelper
 import com.facebook.react.uimanager.events.Event
 import java.text.SimpleDateFormat
+import java.util.ArrayDeque
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
@@ -50,7 +51,9 @@ class PlaypathPlayerView(context: Context) :
     Player.Listener,
     AnalyticsListener {
     private val player: ExoPlayer
+    private val surface: PlayerView
     private val handler = Handler(Looper.getMainLooper())
+    private val pendingEvents = ArrayDeque<String>()
     private val ticker = object : Runnable {
         override fun run() {
             if (!released) {
@@ -61,11 +64,13 @@ class PlaypathPlayerView(context: Context) :
     }
     private var released = false
     private var seeking = false
+    private var seekOpen = false
     private var sessionId = ""
     private var manifestUrl: String? = null
     private var startupLogged = false
     private var drmReported = false
     private var loadStartedAt = 0L
+    private var firstFrameAt = 0L
     private var recordedHeight = 0
     private var recordedBandwidth = 0
     private var errorMessage: String? = null
@@ -89,7 +94,7 @@ class PlaypathPlayerView(context: Context) :
             .build()
         player.addListener(this)
         player.addAnalyticsListener(this)
-        val surface = PlayerView(context).apply {
+        surface = PlayerView(context).apply {
             this.player = this@PlaypathPlayerView.player
             useController = false
             resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
@@ -107,9 +112,12 @@ class PlaypathPlayerView(context: Context) :
         sessionId = UUID.randomUUID().toString()
         startupLogged = false
         drmReported = false
+        seeking = false
+        seekOpen = false
         recordedHeight = 0
         recordedBandwidth = 0
         errorMessage = null
+        firstFrameAt = 0L
         loadStartedAt = SystemClock.elapsedRealtime()
         player.setMediaItem(filmItem(url))
         player.prepare()
@@ -122,7 +130,7 @@ class PlaypathPlayerView(context: Context) :
             return
         }
         playWhenLoaded = true
-        if (player.playbackState == Player.STATE_ENDED) {
+        if (player.playbackState == Player.STATE_ENDED && !seekOpen) {
             player.seekTo(0)
         }
         player.play()
@@ -142,7 +150,11 @@ class PlaypathPlayerView(context: Context) :
         if (released) {
             return
         }
-        seeking = true
+        seekOpen = player.playWhenReady
+        seeking = seekOpen
+        if (seeking) {
+            publish()
+        }
         player.seekTo(positionMs.toLong().coerceAtLeast(0))
         publish()
     }
@@ -152,23 +164,33 @@ class PlaypathPlayerView(context: Context) :
             return
         }
         released = true
+        pendingEvents.clear()
         handler.removeCallbacks(ticker)
         player.removeListener(this)
         player.removeAnalyticsListener(this)
+        surface.player = null
         player.release()
+    }
+
+    override fun onRenderedFirstFrame() {
+        if (firstFrameAt == 0L && loadStartedAt != 0L) {
+            firstFrameAt = SystemClock.elapsedRealtime()
+        }
     }
 
     override fun onIsPlayingChanged(isPlaying: Boolean) {
         if (isPlaying) {
+            seekOpen = false
             seeking = false
             if (!startupLogged && manifestUrl != null) {
                 startupLogged = true
+                val frameAt = if (firstFrameAt > 0L) firstFrameAt else SystemClock.elapsedRealtime()
                 emitEvent(
                     startupEvent(
                         sessionId = sessionId,
                         at = utcNow(),
                         positionMs = player.currentPosition.coerceAtLeast(0),
-                        startupMs = SystemClock.elapsedRealtime() - loadStartedAt,
+                        startupMs = frameAt - loadStartedAt,
                         manifestUrl = manifestUrl ?: "",
                     ),
                 )
@@ -183,19 +205,33 @@ class PlaypathPlayerView(context: Context) :
         reason: Int,
     ) {
         if (reason == Player.DISCONTINUITY_REASON_SEEK) {
-            seeking = true
+            val landed = player.isPlaying &&
+                (player.playbackState == Player.STATE_READY ||
+                    player.playbackState == Player.STATE_ENDED)
+            if (!player.playWhenReady || landed) {
+                seekOpen = false
+                seeking = false
+            } else {
+                seeking = true
+            }
             publish()
         }
     }
 
     override fun onPlaybackStateChanged(playbackState: Int) {
-        if (playbackState == Player.STATE_READY) {
+        if (
+            seekOpen &&
+            (playbackState == Player.STATE_READY || playbackState == Player.STATE_ENDED)
+        ) {
+            seekOpen = false
             seeking = false
         }
         publish()
     }
 
     override fun onPlayerError(error: PlaybackException) {
+        seekOpen = false
+        seeking = false
         if (error.errorCode in DRM_ERROR_FIRST..DRM_ERROR_LAST) {
             errorMessage = DRM_ERROR
             if (!drmReported) {
@@ -291,6 +327,7 @@ class PlaypathPlayerView(context: Context) :
         if (released) {
             return
         }
+        flushPendingEvents()
         val duration = player.duration
         val payload = Arguments.createMap().apply {
             putString("playbackState", stateName())
@@ -301,11 +338,15 @@ class PlaypathPlayerView(context: Context) :
                     !seeking,
             )
             putBoolean("adPlaying", false)
-            putInt("positionMs", player.currentPosition.coerceAtLeast(0).toInt())
-            putInt("durationMs", if (duration > 0) duration.toInt() else 0)
+            putInt("positionMs", snapshotMs(player.currentPosition))
+            putInt("durationMs", if (duration > 0) snapshotMs(duration) else 0)
             putString("error", errorMessage ?: "")
         }
         emit("onSnapshot", payload)
+    }
+
+    private fun snapshotMs(value: Long): Int {
+        return value.coerceIn(0, Int.MAX_VALUE.toLong()).toInt()
     }
 
     private fun stateName(): String {
@@ -322,20 +363,39 @@ class PlaypathPlayerView(context: Context) :
     }
 
     private fun emitEvent(json: String) {
+        if (released) {
+            return
+        }
         Log.i(EVENT_LOG, json)
+        if (!dispatchPlayback(json)) {
+            pendingEvents.addLast(json)
+        }
+    }
+
+    private fun flushPendingEvents() {
+        while (pendingEvents.isNotEmpty()) {
+            if (!dispatchPlayback(pendingEvents.first())) {
+                return
+            }
+            pendingEvents.removeFirst()
+        }
+    }
+
+    private fun dispatchPlayback(json: String): Boolean {
         val payload = Arguments.createMap().apply {
             putString("json", json)
         }
-        emit("onPlaybackEvent", payload)
+        return emit("onPlaybackEvent", payload)
     }
 
-    private fun emit(eventName: String, payload: WritableMap) {
-        val reactContext = context as? ReactContext ?: return
+    private fun emit(eventName: String, payload: WritableMap): Boolean {
+        val reactContext = context as? ReactContext ?: return false
         if (id == NO_ID) {
-            return
+            return false
         }
-        val dispatcher = UIManagerHelper.getEventDispatcherForReactTag(reactContext, id) ?: return
+        val dispatcher = UIManagerHelper.getEventDispatcherForReactTag(reactContext, id) ?: return false
         dispatcher.dispatchEvent(BridgeEvent(UIManagerHelper.getSurfaceId(this), id, eventName, payload))
+        return true
     }
 }
 
