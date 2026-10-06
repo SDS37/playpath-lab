@@ -23,6 +23,9 @@ var vastMidroll []byte
 // vastDocumentBase is the origin written in vast/midroll.xml. Serving replaces it with the configured public base.
 const vastDocumentBase = "http://127.0.0.1:8083"
 
+// webOrigin is the page that reads the VAST document.
+const webOrigin = "http://127.0.0.1:5173"
+
 var (
 	errNoFilm    = errors.New("film package is missing")
 	errNoPreroll = errors.New("pre-roll package is missing")
@@ -129,6 +132,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.servePlaylist(w, r, "manifest.mpd", "application/dash+xml", s.stitchDASH)
 		return
 	case "/vast/midroll.xml":
+		allowWeb(w, r)
 		w.Header().Set("Content-Type", "application/xml")
 		http.ServeContent(w, r, "midroll.xml", time.Time{}, bytes.NewReader(s.vastDocument()))
 		return
@@ -152,6 +156,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) vastDocument() []byte {
 	return bytes.ReplaceAll(vastMidroll, []byte(vastDocumentBase), []byte(s.adsBase))
+}
+
+func allowWeb(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Vary", "Origin")
+	if r.Header.Get("Origin") != webOrigin {
+		return
+	}
+	w.Header().Set("Access-Control-Allow-Origin", webOrigin)
 }
 
 func (s *Server) servePlaylist(w http.ResponseWriter, r *http.Request, filmRel, ctype string, build func() (string, error)) {

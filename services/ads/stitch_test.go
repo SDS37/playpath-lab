@@ -122,6 +122,24 @@ func TestNewRejectsBaseURL(t *testing.T) {
 	}
 }
 
+func TestVASTAllowsTheWebPage(t *testing.T) {
+	handler := fixture(t)
+	web := httptest.NewRequest(http.MethodGet, "/vast/midroll.xml", nil)
+	web.Header.Set("Origin", "http://127.0.0.1:5173")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, web)
+	if rec.Code != http.StatusOK || rec.Header().Get("Access-Control-Allow-Origin") != webOrigin || rec.Header().Get("Vary") != "Origin" {
+		t.Fatalf("web %d origin %q vary %q", rec.Code, rec.Header().Get("Access-Control-Allow-Origin"), rec.Header().Get("Vary"))
+	}
+	other := httptest.NewRequest(http.MethodGet, "/vast/midroll.xml", nil)
+	other.Header.Set("Origin", "http://example.test")
+	otherRec := httptest.NewRecorder()
+	handler.ServeHTTP(otherRec, other)
+	if otherRec.Code != http.StatusOK || otherRec.Header().Get("Access-Control-Allow-Origin") != "" || otherRec.Header().Get("Vary") != "Origin" {
+		t.Fatalf("other %d origin %q vary %q", otherRec.Code, otherRec.Header().Get("Access-Control-Allow-Origin"), otherRec.Header().Get("Vary"))
+	}
+}
+
 func TestVASTMidroll(t *testing.T) {
 	handler := fixture(t)
 	srv := httptest.NewServer(handler)
