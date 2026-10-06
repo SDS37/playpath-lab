@@ -79,14 +79,14 @@ func New(path string) (*Server, error) {
 // The log records the key id. It does not record the key.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.allowWeb(w, r)
-	if r.Method == http.MethodOptions {
-		w.WriteHeader(http.StatusNoContent)
-		log.Printf("%s %s %d keyId=-", r.Method, r.URL.Path, http.StatusNoContent)
-		return
-	}
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		log.Printf("%s %s %d keyId=-", r.Method, r.URL.Path, http.StatusNotFound)
+		return
+	}
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		log.Printf("%s %s %d keyId=-", r.Method, r.URL.Path, http.StatusNoContent)
 		return
 	}
 	if r.Method != http.MethodPost {

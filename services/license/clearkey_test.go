@@ -76,6 +76,13 @@ func TestDoesNotRedirectOrLogTheKey(t *testing.T) {
 	if rec.Code != http.StatusNotFound || rec.Header().Get("Location") != "" {
 		t.Fatalf("clear path status %d location %q", rec.Code, rec.Header().Get("Location"))
 	}
+	preflight := httptest.NewRequest(http.MethodOptions, "http://127.0.0.1:8082/master.m3u8", nil)
+	preflight.Header.Set("Origin", webOrigin)
+	other := httptest.NewRecorder()
+	handler.ServeHTTP(other, preflight)
+	if other.Code != http.StatusNotFound {
+		t.Fatalf("options clear path %d", other.Code)
+	}
 
 	kid := base64.RawURLEncoding.EncodeToString(handler.kid)
 	rec = post(t, handler, "/", `{"kids":["`+kid+`"]}`, "")
