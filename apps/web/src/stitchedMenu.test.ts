@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  cleanDash,
+  cleanMenu,
   isStitched,
   presentationCueMs,
   stitchedDash,
@@ -19,5 +21,15 @@ describe("stitched menu", () => {
     );
     expect(stitchedDash).not.toContain("vast/impression");
     expect(stitchedDash).not.toContain("ffefcdab");
+  });
+
+  it("uses the clean film when the stitched menu cannot be loaded", () => {
+    expect(cleanMenu(stitchedDash)).toBe(cleanDash);
+    expect(cleanDash).toBe("http://127.0.0.1:8080/manifest.mpd");
+    expect(cleanMenu(cleanDash)).toBeUndefined();
+    expect(cleanMenu("http://127.0.0.1:8083/vast/impression")).toBeUndefined();
+    expect(cleanDash).not.toContain("vast/impression");
+    expect(cleanDash).not.toContain("8083");
+    expect(cleanDash).not.toContain("ffefcdab");
   });
 });

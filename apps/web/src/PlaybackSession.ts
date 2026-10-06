@@ -13,7 +13,12 @@ import { chooseEngine } from "./chooseEngine";
 import { clearKeyLicenseUrl, drmServers } from "./drmServers";
 import { rewriteClearKeyPlaylist } from "./hlsClearKey";
 import { fetchMidroll, playingAtCue } from "./midroll";
-import { isStitched, presentationCueMs, stitchedLeadMs } from "./stitchedMenu";
+import {
+  cleanMenu,
+  isStitched,
+  presentationCueMs,
+  stitchedLeadMs,
+} from "./stitchedMenu";
 
 export type PlaybackState = "playing" | "paused" | "seeking" | "ended";
 
@@ -364,6 +369,11 @@ export class PlaybackSession {
       this.#publishFromVideo();
     } catch (err) {
       if (generation !== this.#generation) {
+        return;
+      }
+      const next = cleanMenu(manifestUrl);
+      if (next !== undefined) {
+        await this.load(next);
         return;
       }
       this.#fail(err);
