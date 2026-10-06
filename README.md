@@ -4,7 +4,7 @@ One title, many devices. The lab follows a single programme from the master file
 
 License: MIT
 
-This repository is the proof of that path. **Today:** the documents in [`docs/`](docs/README.md) define the architecture. `./pipeline/master.sh` writes the phase 1 mezzanine ([PP-010](https://github.com/SDS37/playpath-lab/issues/12)). `./pipeline/hls.sh` writes the CMAF ladder and the HLS menu ([PP-020](https://github.com/SDS37/playpath-lab/issues/13)). `./pipeline/dash.sh` writes the DASH menu for those same segments ([PP-021](https://github.com/SDS37/playpath-lab/issues/14)). `./pipeline/timelines.sh` fails if the two menus diverge ([PP-022](https://github.com/SDS37/playpath-lab/issues/15)). `./pipeline/encrypt.sh` writes a CENC copy of that ladder and names the lab key id in both menus ([PP-030](https://github.com/SDS37/playpath-lab/issues/16)). `go run ./services/origin` serves that copy on `http://127.0.0.1:8080` ([PP-040](https://github.com/SDS37/playpath-lab/issues/17)). The same command on `http://127.0.0.1:8081` serves that copy again, and [`services/origin/session.json`](services/origin/session.json) records the second base URL. Playback that continues from that URL after a segment error is not observed yet ([PP-041](https://github.com/SDS37/playpath-lab/issues/18)). `./pipeline/preroll.sh` writes a clear pre-roll of about 5 seconds, and `go run ./services/ads` returns an HLS menu and a DASH MPD on `http://127.0.0.1:8083` that start with that pre-roll and then the film ([PP-050](https://github.com/SDS37/playpath-lab/issues/19)). The same service returns a VAST mid-roll at `http://127.0.0.1:8083/vast/midroll.xml` ([PP-051](https://github.com/SDS37/playpath-lab/issues/20)). The cue is 10 seconds into the film. The clean film menus stay on origin A. [`services/ads/session.json`](services/ads/session.json) names those clean menus for when the stitched URL fails ([PP-052](https://github.com/SDS37/playpath-lab/issues/21)). Playing either break, the fallback, and the impressions, wait for an app. `go run ./services/license` answers a Clear Key request on `http://127.0.0.1:8082` for the lab key id. An unknown key id is a non-success status. `apps/web` plays either protected menu with Shaka on `http://127.0.0.1:5173` after that response. Clear HLS plays through hls.js from `http://127.0.0.1:8084/master.m3u8`. A Safari play on the media element is not observed yet. `apps/android` plays the encrypted DASH menu with Media3. The license log shows `POST / 200` and the lab key id, and the Compose screen shows the picture. A wrong key id is `POST / 403`, a black picture, and a `drm` event with `result: "error"`. iOS and React Native are not built yet. When they exist, the [Definition of Done](docs/DoD.md) is the checklist.
+This repository is the proof of that path. **Today:** the documents in [`docs/`](docs/README.md) define the architecture. `./pipeline/master.sh` writes the phase 1 mezzanine ([PP-010](https://github.com/SDS37/playpath-lab/issues/12)). `./pipeline/hls.sh` writes the CMAF ladder and the HLS menu ([PP-020](https://github.com/SDS37/playpath-lab/issues/13)). `./pipeline/dash.sh` writes the DASH menu for those same segments ([PP-021](https://github.com/SDS37/playpath-lab/issues/14)). `./pipeline/timelines.sh` fails if the two menus diverge ([PP-022](https://github.com/SDS37/playpath-lab/issues/15)). `./pipeline/encrypt.sh` writes a CENC copy of that ladder and names the lab key id in both menus ([PP-030](https://github.com/SDS37/playpath-lab/issues/16)). `go run ./services/origin` serves that copy on `http://127.0.0.1:8080` ([PP-040](https://github.com/SDS37/playpath-lab/issues/17)). The same command on `http://127.0.0.1:8081` serves that copy again, and [`services/origin/session.json`](services/origin/session.json) records the second base URL. Playback that continues from that URL after a segment error is not observed yet ([PP-041](https://github.com/SDS37/playpath-lab/issues/18)). `./pipeline/preroll.sh` writes a clear pre-roll of about 5 seconds, and `go run ./services/ads` returns an HLS menu and a DASH MPD on `http://127.0.0.1:8083` that start with that pre-roll and then the film ([PP-050](https://github.com/SDS37/playpath-lab/issues/19)). The same service returns a VAST mid-roll at `http://127.0.0.1:8083/vast/midroll.xml` ([PP-051](https://github.com/SDS37/playpath-lab/issues/20)). The cue is 10 seconds into the film. The clean film menus stay on origin A. [`services/ads/session.json`](services/ads/session.json) names those clean menus for when the stitched URL fails ([PP-052](https://github.com/SDS37/playpath-lab/issues/21)). Playing either break, the fallback, and the impressions, wait for an app. `go run ./services/license` answers a Clear Key request on `http://127.0.0.1:8082` for the lab key id. An unknown key id is a non-success status. `apps/web` plays either protected menu with Shaka on `http://127.0.0.1:5173` after that response. Clear HLS plays through hls.js from `http://127.0.0.1:8084/master.m3u8`. A Safari play on the media element is not observed yet. `apps/android` plays the encrypted DASH menu with Media3. The license log shows `POST / 200` and the lab key id, and the Compose screen shows the picture. A wrong key id is `POST / 403`, a black picture, and a `drm` event with `result: "error"`. `apps/ios` plays clear HLS with `AVPlayer`. The simulator shows the picture, and that play does not call the license service. FairPlay is not reported as passing. React Native is not built yet. When it exists, the [Definition of Done](docs/DoD.md) is the checklist.
 
 ## Current status
 
@@ -12,7 +12,7 @@ This repository is the proof of that path. **Today:** the documents in [`docs/`]
 |---|---|
 | Business and technical requirements | Written |
 | Architecture, ADRs, engines, happy path | Written |
-| Roadmap M0 | Done (docs). M1 and M2 package commands exist. M3 encrypt command exists. M4 origins A and B exist. M5 stitcher, VAST document, and stitcher fallback choice exist. M6 is not done: the web app plays protected DASH and HLS with Shaka, and clear HLS with hls.js. A Safari play of clear HLS is not observed yet. Android plays encrypted DASH with Media3, including a wrong key id that stays black. AVPlayer is not started. M7–M10 are not started |
+| Roadmap M0 | Done (docs). M1 and M2 package commands exist. M3 encrypt command exists. M4 origins A and B exist. M5 stitcher, VAST document, and stitcher fallback choice exist. M6 is not done: the web app plays protected DASH and HLS with Shaka, and clear HLS with hls.js. A Safari play of clear HLS is not observed yet. Android plays encrypted DASH with Media3, including a wrong key id that stays black. iOS plays clear HLS with AVPlayer. FairPlay is not reported as passing. M7–M10 are not started |
 | Code standards (TypeScript, JavaScript, React, React Native, CSS, Kotlin, Swift, Go) | Written |
 | Master file | `./pipeline/master.sh` writes `pipeline/master/playpath-bars.mp4` and `.vtt` |
 | Packager | `./pipeline/hls.sh` writes the CMAF ladder and `master.m3u8`. `./pipeline/dash.sh` writes `manifest.mpd`. `./pipeline/timelines.sh` fails if the menus diverge |
@@ -71,7 +71,7 @@ A stall is fixed in playback. A control that does not match the engine is fixed 
 
 ## Repository structure
 
-Target layout. Today the repository has `docs/`, `pipeline/`, `services/origin`, `services/ads`, `services/license`, `apps/web`, and `apps/android`. iOS and React Native are not created yet.
+Target layout. Today the repository has `docs/`, `pipeline/`, `services/origin`, `services/ads`, `services/license`, `apps/web`, `apps/android`, and `apps/ios`. React Native is not created yet.
 
 ```
 playpath-lab/
@@ -221,6 +221,16 @@ Requires the protected package, origin A, the license service, a JDK, and an And
 ```
 
 `adb reverse tcp:8080 tcp:8080` and `adb reverse tcp:8082 tcp:8082` make the emulator’s `127.0.0.1` the host, which is what the menu and the license URL already say. Install the debug APK and open it. DASH plays after `POST / 200`. Wrong key stays black after `POST / 403`. The content key is not in the app. See [`apps/android/README.md`](apps/android/README.md).
+
+## Play on iOS
+
+Requires the clear package and an iOS simulator. From `apps/ios`:
+
+```bash
+xcodebuild -project Playpath.xcodeproj -scheme Playpath -sdk iphonesimulator -configuration Debug -derivedDataPath build build
+```
+
+The simulator uses the host’s `127.0.0.1`, so `http://127.0.0.1:8084/master.m3u8` needs no port reverse. The picture appears in UIKit. The license log does not show a request from that play. FairPlay needs an FPS certificate and `AVContentKeySession`, and this app does not report that as passing. See [`apps/ios/README.md`](apps/ios/README.md).
 
 ## Commit convention
 
