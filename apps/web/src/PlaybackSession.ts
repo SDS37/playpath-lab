@@ -33,6 +33,27 @@ export type PlaybackSnapshot = {
 
 const metadataTimeoutMs = 5000;
 
+type NativeAudioTrack = {
+  language: string;
+  enabled: boolean;
+};
+
+type NativeAudioTrackList = {
+  readonly length: number;
+  [index: number]: NativeAudioTrack | undefined;
+  addEventListener(type: "addtrack", listener: () => void): void;
+  removeEventListener(type: "addtrack", listener: () => void): void;
+};
+
+function nativeAudioTracks(
+  video: HTMLVideoElement,
+): NativeAudioTrackList | undefined {
+  const host = video as HTMLVideoElement & {
+    audioTracks?: NativeAudioTrackList;
+  };
+  return host.audioTracks;
+}
+
 const videoEvents = [
   "play",
   "pause",
@@ -144,6 +165,13 @@ export class PlaybackSession {
       return;
     }
     this.#applyCaptions();
+    this.#applyAudio();
+  };
+  #onAudioTrack = (): void => {
+    if (this.#engine !== "native" || this.#adPhase === "creative") {
+      return;
+    }
+    this.#applyAudio();
   };
   #onNativeResize = (): void => {
     if (!this.#native || this.#nativeGeneration !== this.#generation) {
@@ -313,6 +341,7 @@ export class PlaybackSession {
       }
       this.#noteShaka(player);
       this.#applyCaptions();
+      this.#applyAudio();
       this.#publishFromVideo();
     } catch (err) {
       if (generation !== this.#generation) {
@@ -347,6 +376,7 @@ export class PlaybackSession {
   setCaptions(enabled: boolean): void {
     this.#captions = enabled;
     this.#applyCaptions();
+    this.#applyAudio();
     this.#set({ ...this.#snapshot, captions: enabled });
   }
 
@@ -386,10 +416,17 @@ export class PlaybackSession {
       }
       this.#applyCaptions();
     });
+    hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => {
+      if (generation !== this.#generation || this.#adPhase === "creative") {
+        return;
+      }
+      this.#applyAudio();
+    });
     hls.loadSource(manifestUrl);
     hls.attachMedia(this.#video);
     this.#bindVideo();
     this.#applyCaptions();
+    this.#applyAudio();
   }
 
   #loadNativeHls(manifestUrl: string, generation: number): void {
@@ -399,9 +436,14 @@ export class PlaybackSession {
     this.#video.addEventListener("error", this.#onNativeError);
     this.#video.addEventListener("resize", this.#onNativeResize);
     this.#video.textTracks.addEventListener("addtrack", this.#onTextTrack);
+    const audioTracks = nativeAudioTracks(this.#video);
+    if (audioTracks !== undefined) {
+      audioTracks.addEventListener("addtrack", this.#onAudioTrack);
+    }
     this.#video.src = manifestUrl;
     this.#bindVideo();
     this.#applyCaptions();
+    this.#applyAudio();
   }
 
   #applyCaptions(): void {
@@ -457,6 +499,65 @@ export class PlaybackSession {
     }
   }
 
+  #applyAudio(): void {
+    if (this.#adPhase === "creative") {
+      return;
+    }
+    const player = this.#player;
+    if (player !== null) {
+      const tracks = player.getAudioTracks();
+      const track =
+        tracks.find(
+          (item) => item.language === "en" || item.language === "eng",
+        ) ?? tracks[0];
+      if (track !== undefined && !track.active) {
+        player.selectAudioTrack(track);
+      }
+      return;
+    }
+    const hls = this.#hls;
+    if (hls !== null) {
+      const english = hls.audioTracks.findIndex(
+        (item) =>
+          item.lang === "en" || item.lang === "eng" || item.name === "English",
+      );
+      if (english >= 0 && hls.audioTrack !== english) {
+        hls.audioTrack = english;
+      }
+      return;
+    }
+    if (!this.#native) {
+      return;
+    }
+    const tracks = nativeAudioTracks(this.#video);
+    if (tracks === undefined) {
+      return;
+    }
+    let chosen = -1;
+    for (let index = 0; index < tracks.length; index += 1) {
+      const track = tracks[index];
+      if (track === undefined) {
+        continue;
+      }
+      const language = track.language.toLowerCase();
+      if (
+        language === "en" ||
+        language === "eng" ||
+        language.startsWith("en-")
+      ) {
+        chosen = index;
+        break;
+      }
+    }
+    if (chosen < 0 && tracks.length > 0) {
+      chosen = 0;
+    }
+    const selected = chosen >= 0 ? tracks[chosen] : undefined;
+    if (selected !== undefined && !selected.enabled) {
+      selected.enabled = true;
+    }
+  }
+
   async #releasePlayer(): Promise<void> {
     const hls = this.#hls;
     this.#hls = null;
@@ -474,6 +575,10 @@ export class PlaybackSession {
       this.#video.removeEventListener("error", this.#onNativeError);
       this.#video.removeEventListener("resize", this.#onNativeResize);
       this.#video.textTracks.removeEventListener("addtrack", this.#onTextTrack);
+      nativeAudioTracks(this.#video)?.removeEventListener(
+        "addtrack",
+        this.#onAudioTrack,
+      );
       this.#native = false;
       this.#video.removeAttribute("src");
       this.#video.load();
@@ -761,6 +866,7 @@ export class PlaybackSession {
       }
       if (restored && generation === this.#generation) {
         this.#applyCaptions();
+        this.#applyAudio();
       }
       if (!restored || generation !== this.#generation) {
         this.#unlockAd(generation);

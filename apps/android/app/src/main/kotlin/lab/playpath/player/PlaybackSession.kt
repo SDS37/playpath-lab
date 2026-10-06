@@ -445,6 +445,7 @@ class PlaybackSession(
     private fun applyCaptions() {
         player.trackSelectionParameters = player.trackSelectionParameters
             .buildUpon()
+            .setPreferredAudioLanguage("en")
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, !captions)
             .setPreferredTextLanguage(if (captions) "en" else null)
             .setSelectUndeterminedTextLanguage(captions)

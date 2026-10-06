@@ -67,6 +67,7 @@ final class PlaybackSession {
     private var captions = true
     private var captionText = ""
     private var captionGeneration = 0
+    private var audioGeneration = 0
     private let captionOutput = CaptionOutput()
     private var activeCaptionOutput: AVPlayerItemLegibleOutput?
     private var timeObserver: Any?
@@ -294,6 +295,7 @@ final class PlaybackSession {
                 creativeStarted = true
             } else {
                 selectCaptions(on: item)
+                selectAudio(on: item)
                 if adPhase == .resume {
                     arriveAtCue()
                 }
@@ -612,6 +614,31 @@ final class PlaybackSession {
                 item.select(nil, in: group)
                 self.captionText = ""
                 self.publish()
+            }
+        }
+    }
+
+    private func selectAudio(on item: AVPlayerItem) {
+        audioGeneration += 1
+        let generation = audioGeneration
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+            let group = try? await item.asset.loadMediaSelectionGroup(for: .audible)
+            guard generation == self.audioGeneration, self.player.currentItem === item else {
+                return
+            }
+            guard let group else {
+                return
+            }
+            let english = group.options.first { option in
+                option.extendedLanguageTag == "en" ||
+                    option.extendedLanguageTag == "eng" ||
+                    option.locale?.language.languageCode?.identifier == "en"
+            }
+            if let option = english ?? group.defaultOption ?? group.options.first {
+                item.select(option, in: group)
             }
         }
     }
