@@ -1,4 +1,6 @@
+import Hls from "hls.js";
 import shaka from "shaka-player";
+import { chooseEngine } from "./chooseEngine";
 import { clearKeyLicenseUrl, drmServers } from "./drmServers";
 import { rewriteClearKeyPlaylist } from "./hlsClearKey";
 
@@ -35,12 +37,21 @@ export const initialSnapshot: PlaybackSnapshot = {
 export class PlaybackSession {
   #video: HTMLVideoElement;
   #player: shaka.Player | null = null;
+  #hls: Hls | null = null;
+  #native = false;
+  #nativeGeneration = 0;
   #generation = 0;
   #bound = false;
   #listeners = new Set<(snapshot: PlaybackSnapshot) => void>();
   #snapshot: PlaybackSnapshot = initialSnapshot;
   #onVideo = (): void => {
     this.#publishFromVideo();
+  };
+  #onNativeError = (): void => {
+    if (!this.#native || this.#nativeGeneration !== this.#generation) {
+      return;
+    }
+    this.#fail(this.#video.error);
   };
 
   constructor(video: HTMLVideoElement) {
@@ -63,6 +74,28 @@ export class PlaybackSession {
       return;
     }
     this.#set({ ...initialSnapshot });
+
+    const choice = chooseEngine(manifestUrl, {
+      hlsJs: Hls.isSupported(),
+      nativeHls:
+        this.#video.canPlayType("application/vnd.apple.mpegurl") !== "",
+      safari: navigator.vendor === "Apple Computer, Inc.",
+    });
+    if (choice === "hlsjs") {
+      this.#loadHlsJs(manifestUrl, generation);
+      return;
+    }
+    if (choice === "nativeHls") {
+      this.#loadNativeHls(manifestUrl, generation);
+      return;
+    }
+    if (choice === undefined) {
+      this.#set({
+        ...this.#snapshot,
+        error: "This browser cannot play the title.",
+      });
+      return;
+    }
 
     shaka.polyfill.installAll();
     if (!shaka.Player.isBrowserSupported()) {
@@ -167,11 +200,44 @@ export class PlaybackSession {
     await this.#releasePlayer();
   }
 
+  #loadHlsJs(manifestUrl: string, generation: number): void {
+    const hls = new Hls();
+    this.#hls = hls;
+    hls.on(Hls.Events.ERROR, (_event, data) => {
+      if (generation !== this.#generation || !data.fatal) {
+        return;
+      }
+      this.#fail(data);
+    });
+    hls.loadSource(manifestUrl);
+    hls.attachMedia(this.#video);
+    this.#bindVideo();
+  }
+
+  #loadNativeHls(manifestUrl: string, generation: number): void {
+    this.#native = true;
+    this.#nativeGeneration = generation;
+    this.#video.addEventListener("error", this.#onNativeError);
+    this.#video.src = manifestUrl;
+    this.#bindVideo();
+  }
+
   async #releasePlayer(): Promise<void> {
+    const hls = this.#hls;
+    this.#hls = null;
+    if (hls) {
+      hls.destroy();
+    }
     const player = this.#player;
     this.#player = null;
     if (player) {
       await player.destroy();
+    }
+    if (this.#native) {
+      this.#video.removeEventListener("error", this.#onNativeError);
+      this.#native = false;
+      this.#video.removeAttribute("src");
+      this.#video.load();
     }
   }
 

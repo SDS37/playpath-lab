@@ -26,6 +26,8 @@ export default defineConfig(
       "src/main.tsx",
       "src/drmServers.ts",
       "src/protectedMenus.ts",
+      "src/clearHlsMenu.ts",
+      "src/chooseEngine.ts",
     ],
     rules: {
       "no-restricted-imports": [
@@ -35,6 +37,10 @@ export default defineConfig(
             {
               name: "shaka-player",
               message: "Only PlaybackSession imports Shaka.",
+            },
+            {
+              name: "hls.js",
+              message: "Only PlaybackSession imports hls.js.",
             },
           ],
         },

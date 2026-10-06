@@ -25,7 +25,7 @@ Shaka is the web player whenever the title is encrypted, whether the menu is DAS
 
 Primary source: the project [README](https://github.com/video-dev/hls.js/).
 
-Use it only when `Hls.isSupported()` is true and the menu is clear HLS. The supported sequence is: construct `Hls`, `loadSource` the master playlist, `attachMedia` the element. Destroy the instance when the screen goes away. On Safari, skip hls.js when `canPlayType` says the element can play HLS.
+The web session uses hls.js 1.7.3 for the clear menu `http://127.0.0.1:8084/master.m3u8` on Chrome, Edge, and Firefox, where `Hls.isSupported()` is true. The sequence is: construct `Hls`, `loadSource` that master playlist, `attachMedia` the element. Destroy the instance when the screen goes away. Safari plays that menu on the media element and does not construct hls.js, including when hls.js also reports support, because `canPlayType` says the element can play HLS. Chromium returns `maybe` for that type too, so the Safari branch is the Apple vendor rather than the type string alone. A play of that branch on Safari is not observed yet. A browser that cannot run hls.js and can play HLS also uses the element.
 
 hls.js covers a real gap: Chromium and Firefox do not play HLS by themselves. It is a weak place to hang DRM. The protected package does not go through this object.
 

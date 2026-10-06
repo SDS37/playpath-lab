@@ -147,6 +147,7 @@ These are the planned development ports. They are reserved here so later READMEs
 | Origin B | `http://127.0.0.1:8081` |
 | License | `http://127.0.0.1:8082` |
 | Ads (SSAI and VAST) | `http://127.0.0.1:8083` |
+| Clear package | `http://127.0.0.1:8084` |
 | Web app | `http://127.0.0.1:5173` |
 
 ## Languages and modules
