@@ -1,5 +1,6 @@
 import Hls from "hls.js";
 import shaka from "shaka-player";
+import { segmentUriForAttempt } from "./backupOrigin";
 import {
   adEvent,
   bitrateEvent,
@@ -300,6 +301,20 @@ export class PlaybackSession {
         this.#set({ ...this.#snapshot, error: "Playback failed." });
         return;
       }
+      network.registerRequestFilter((type, request) => {
+        if (
+          type !== shaka.net.NetworkingEngine.RequestType.SEGMENT ||
+          request.uris.length === 0
+        ) {
+          return;
+        }
+        const index = request.attempt % request.uris.length;
+        const uri = request.uris[index];
+        if (uri === undefined) {
+          return;
+        }
+        request.uris[index] = segmentUriForAttempt(uri, request.attempt);
+      });
       network.registerResponseFilter((_type, response) => {
         if (!response.uri.endsWith(".m3u8")) {
           return;
