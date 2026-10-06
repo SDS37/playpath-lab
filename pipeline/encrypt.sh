@@ -37,8 +37,8 @@ if [[ ! -f "${key_file}" ]]; then
   exit 1
 fi
 
-# Publish only after encryption succeeds. A failed run must not leave the
-# clear ladder at the path origin serves as the protected package.
+# Publish only after encryption and the checks below succeed. A failed run
+# must not replace the protected package.
 work="${out}.tmp"
 rm -rf "${work}"
 mkdir -p "${work}"
@@ -725,17 +725,21 @@ then
   rm -rf "${work}"
   exit 1
 fi
-rm -rf "${out}"
-mv "${work}" "${out}"
-
 shopt -s nullglob
 playlists=("${master_dir}"/*.m3u8 "${master_dir}"/*.mpd "${master_dir}"/*.m4s "${master_dir}"/*.ts)
 if ((${#playlists[@]} > 0)); then
+  rm -rf "${work}"
   echo "Encryption wrote a playlist or a segment into the master directory." >&2
   printf '%s\n' "${playlists[@]}" >&2
   exit 1
 fi
 
-"${root}/pipeline/timelines.sh"
+if ! "${root}/pipeline/timelines.sh"; then
+  rm -rf "${work}"
+  exit 1
+fi
+
+rm -rf "${out}"
+mv "${work}" "${out}"
 
 echo "Title id: ${title}"
