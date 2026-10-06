@@ -1,6 +1,7 @@
 package lab.playpath.player
 
 import android.content.Context
+import android.os.SystemClock
 import android.util.Log
 import android.view.View
 import androidx.annotation.OptIn
@@ -72,6 +73,8 @@ class PlaybackSession(
     private var adAttempt = 0
     private var creativeAssigned = false
     private var creativeStarted = false
+    private var startupLogged = false
+    private var loadStartedAt = 0L
     private val sessionJob = SupervisorJob()
     private val scope = CoroutineScope(sessionJob + Dispatchers.Main.immediate)
     private val httpFactory = DefaultHttpDataSource.Factory().setUserAgent("playpath-android")
@@ -132,6 +135,8 @@ class PlaybackSession(
         adAttempt += 1
         creativeAssigned = false
         creativeStarted = false
+        startupLogged = false
+        loadStartedAt = SystemClock.elapsedRealtime()
         this.manifestUrl = manifestUrl
         snapshot = PlaybackUiState()
         publish()
@@ -257,7 +262,7 @@ class PlaybackSession(
             adPhase == AdPhase.Creative &&
             creativeStarted
         ) {
-            scope.launch { resumeFilm() }
+            scope.launch { resumeFilm(completed = true) }
             return
         }
         publish()
@@ -270,6 +275,10 @@ class PlaybackSession(
     override fun onIsPlayingChanged(isPlaying: Boolean) {
         if (isPlaying) {
             seeking = false
+            if (adPhase == AdPhase.Off && !startupLogged) {
+                startupLogged = true
+                logStartup()
+            }
         }
         publish()
     }
@@ -288,7 +297,7 @@ class PlaybackSession(
     override fun onPlayerError(error: PlaybackException) {
         if (adPhase == AdPhase.Creative) {
             if (creativeFailure()) {
-                scope.launch { resumeFilm() }
+                scope.launch { resumeFilm(completed = false) }
             }
             return
         }
@@ -355,6 +364,33 @@ class PlaybackSession(
                 height = height,
                 bandwidthBps = bandwidth,
                 codecs = codecs,
+            ),
+        )
+    }
+
+    private fun logStartup() {
+        val manifest = manifestUrl ?: return
+        val positionMs = if (released) 0 else player.currentPosition.coerceAtLeast(0)
+        Log.i(
+            EVENT_LOG,
+            startupEvent(
+                sessionId = sessionId,
+                at = utcNow(),
+                positionMs = positionMs,
+                startupMs = SystemClock.elapsedRealtime() - loadStartedAt,
+                manifestUrl = manifest,
+            ),
+        )
+    }
+
+    private fun logAd(action: String) {
+        Log.i(
+            EVENT_LOG,
+            adEvent(
+                sessionId = sessionId,
+                at = utcNow(),
+                positionMs = cueMs ?: 0L,
+                action = action,
             ),
         )
     }
@@ -458,6 +494,7 @@ class PlaybackSession(
         creativeAssigned = true
         player.prepare()
         player.play()
+        logAd("start")
         scope.launch {
             delay(CREATIVE_TIMEOUT_MS)
             if (
@@ -466,15 +503,16 @@ class PlaybackSession(
                 adPhase == AdPhase.Creative &&
                 !creativeStarted
             ) {
-                resumeFilm()
+                resumeFilm(completed = false)
             }
         }
     }
 
-    private fun resumeFilm() {
+    private fun resumeFilm(completed: Boolean) {
         if (released || adPhase != AdPhase.Creative) {
             return
         }
+        logAd(if (completed) "complete" else "error")
         val manifest = manifestUrl
         val cue = cueMs
         if (manifest == null || cue == null) {

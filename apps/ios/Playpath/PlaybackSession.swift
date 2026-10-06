@@ -60,6 +60,8 @@ final class PlaybackSession {
     private var adAttempt = 0
     private var creativeAssigned = false
     private var creativeStarted = false
+    private var startupLogged = false
+    private var loadedAt = Date()
     private var timeObserver: Any?
     private var timeControlObservation: NSKeyValueObservation?
     private var itemStatusObservation: NSKeyValueObservation?
@@ -114,6 +116,8 @@ final class PlaybackSession {
         adAttempt += 1
         creativeAssigned = false
         creativeStarted = false
+        startupLogged = false
+        loadedAt = Date()
         let attempt = adAttempt
         let item = AVPlayerItem(url: url)
         observe(item)
@@ -268,7 +272,7 @@ final class PlaybackSession {
         if item.status == .failed {
             if adPhase == .creative {
                 if creativeFailure() {
-                    resumeFilm()
+                    resumeFilm(completed: false)
                 }
                 return
             }
@@ -286,7 +290,7 @@ final class PlaybackSession {
         }
         if adPhase == .creative, creativeAssigned {
             creativeStarted = true
-            resumeFilm()
+            resumeFilm(completed: true)
             return
         }
         didPlayToEnd = true
@@ -300,7 +304,7 @@ final class PlaybackSession {
         }
         if adPhase == .creative {
             if creativeFailure() {
-                resumeFilm()
+                resumeFilm(completed: false)
             }
             return
         }
@@ -334,24 +338,14 @@ final class PlaybackSession {
         }
         recordedHeight = height
         recordedBandwidth = nextBandwidth
-        logBitrate(height: height, bandwidthBps: nextBandwidth)
+        print(bitrateEvent(
+            sessionId: sessionId,
+            at: utcTimestamp(),
+            positionMs: milliseconds(player.currentTime()),
+            height: height,
+            bandwidthBps: nextBandwidth
+        ))
         publish()
-    }
-
-    private func logBitrate(height: Int, bandwidthBps: Int) {
-        let clock = ISO8601DateFormatter()
-        var line = "{\"version\":1,\"titleId\":\"playpath-bars\""
-        line += ",\"sessionId\":\"\(sessionId)\",\"platform\":\"ios\",\"engine\":\"avplayer\""
-        line += ",\"event\":\"bitrate\",\"at\":\"\(clock.string(from: Date()))\""
-        line += ",\"positionMs\":\(milliseconds(player.currentTime()))"
-        if height > 0 {
-            line += ",\"height\":\(height)"
-        }
-        if bandwidthBps > 0 {
-            line += ",\"bandwidthBps\":\(bandwidthBps)"
-        }
-        line += "}"
-        print(line)
     }
 
     private func tick() {
@@ -423,14 +417,16 @@ final class PlaybackSession {
         player.replaceCurrentItem(with: item)
         creativeAssigned = true
         player.play()
+        logAd("start")
         failIfStuck(attempt, phase: .creative)
         publish()
     }
 
-    private func resumeFilm() {
+    private func resumeFilm(completed: Bool) {
         guard adPhase == .creative else {
             return
         }
+        logAd(completed ? "complete" : "error")
         guard let loadedURL, let cueMs else {
             adPhase = .off
             failureMessage = "Playback failed."
@@ -488,7 +484,7 @@ final class PlaybackSession {
                     return
                 }
                 if phase == .creative, !self.creativeStarted {
-                    self.resumeFilm()
+                    self.resumeFilm(completed: false)
                     return
                 }
                 if phase == .resume {
@@ -520,6 +516,31 @@ final class PlaybackSession {
         )
         snapshot = next
         onSnapshot?(next)
+        noteStartup()
+    }
+
+    private func noteStartup() {
+        guard !startupLogged, adPhase == .off, player.timeControlStatus == .playing, let loadedURL else {
+            return
+        }
+        startupLogged = true
+        let elapsed = Int(Date().timeIntervalSince(loadedAt) * 1000)
+        print(startupEvent(
+            sessionId: sessionId,
+            at: utcTimestamp(),
+            positionMs: milliseconds(player.currentTime()),
+            startupMs: elapsed,
+            manifestUrl: loadedURL.absoluteString
+        ))
+    }
+
+    private func logAd(_ action: String) {
+        print(adEvent(
+            sessionId: sessionId,
+            at: utcTimestamp(),
+            positionMs: cueMs ?? 0,
+            action: action
+        ))
     }
 
     private func playbackState() -> PlaybackState {
