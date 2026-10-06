@@ -35,6 +35,8 @@ Primary sources: [Get started](https://developer.android.com/media/media3/exopla
 
 Kotlin builds an `ExoPlayer` with `ExoPlayer.Builder`, sets a `MediaItem` whose URI is the DASH manifest, and prepares. Clear Key uses Media3’s DRM session manager and the license URL. A listener (`Player.Listener`) is the source of playing, stalled, and track changes. Release the player in the Compose `DisposableEffect` or the `ViewModel`’s `onCleared`.
 
+Media3 1.11.1 is the build in `apps/android`. `PlaybackSession` opens a `DefaultDrmSessionManager` for `org.w3.clearkey` at `http://127.0.0.1:8082/`. The content key is not a parameter. On an emulator, `adb reverse` maps `127.0.0.1:8080` and `127.0.0.1:8082` to the host, because those are the URLs already written into the menu and the license service. The observed play shows the color bars after `POST / 200` with the lab key id. `./wrong-kid.sh` writes a menu whose key id the service does not hold. That play is `POST / 403`, a black picture, and a `drm` event with `result: "error"` and `code: "ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED"`. The app does not load the clear package. The stock `PlayerView` control bar is off. Play and pause are intents on the session.
+
 Media3 still contains Java. The app code that configures it is Kotlin. See [standards/dependencies.md](standards/dependencies.md).
 
 The Compose screen draws our controls. A stock `PlayerView` control bar is not the product UI. A surface view may still display frames.

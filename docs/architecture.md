@@ -161,7 +161,7 @@ The app asks an engine to play a URL. The engine fetches the menu, chooses the b
 
 Four engines means four failure modes. A bug in Media3 does not show up on iOS. That is why phase 10 uses one event shape.
 
-`apps/web` is the Chrome, Edge, and Firefox row. `npm run dev` listens on `http://127.0.0.1:5173`. The session loads either protected menu with Shaka, and clear HLS with hls.js from `http://127.0.0.1:8084/master.m3u8`. Play, pause, and seek go through that session. Controls do not import Shaka or hls.js. Safari uses the element for clear HLS and does not construct hls.js, including when hls.js also reports support. A play of that branch on Safari is not observed yet. Media3 and `AVPlayer` are not in this app.
+`apps/web` is the Chrome, Edge, and Firefox row. `npm run dev` listens on `http://127.0.0.1:5173`. The session loads either protected menu with Shaka, and clear HLS with hls.js from `http://127.0.0.1:8084/master.m3u8`. Play, pause, and seek go through that session. Controls do not import Shaka or hls.js. Safari uses the element for clear HLS and does not construct hls.js, including when hls.js also reports support. A play of that branch on Safari is not observed yet. `apps/android` is the Compose and Media3 row. It plays the encrypted DASH menu. `AVPlayer` is not in this build.
 
 ### Phase 7 — License
 
@@ -173,7 +173,7 @@ Phase 3 locked the files in advance. Phase 7 is per viewer, per device, at the m
 
 hls.js is the wrong place to hang DRM. A title that needs DASH plus a key system belongs in Shaka.
 
-`go run ./services/license` listens on `http://127.0.0.1:8082`. `POST /` with the lab key id returns a Clear Key JSON Web Key set. An unknown key id gets a non-success status. The handler does not redirect to the clear package and does not log the key. A page on `http://127.0.0.1:5173` can read that response. The web session’s license call is the EME path Shaka drives, and the page does not read the key. If the key is late, startup time goes up. If it never comes, the screen stays black. That picture, and a `drm` error, still wait for a stopped license. The license service does not hand out the clear package instead.
+`go run ./services/license` listens on `http://127.0.0.1:8082`. `POST /` with the lab key id returns a Clear Key JSON Web Key set. An unknown key id gets a non-success status. The handler does not redirect to the clear package and does not log the key. A page on `http://127.0.0.1:5173` can read that response. The web session’s license call is the EME path Shaka drives, and the page does not read the key. The Android session opens a Media3 DRM session against the same URL. While the encrypted DASH menu plays, the license log shows `POST / 200` and the lab key id. A menu whose key id the service does not hold is `POST / 403`, the Compose picture stays black, and the session logs `drm` with `result: "error"`. The license service does not hand out the clear package instead.
 
 ### Phase 8 — Buffer, ABR, decode
 
@@ -240,7 +240,7 @@ sequenceDiagram
 
 ## 4. Repository layout
 
-The roadmap builds this tree. Today the repository contains `docs/`, this architecture, the root README, the MIT license, and the `pipeline/` commands. Those commands write the mezzanine, both menus, and the protected copy. The media files are build products and are not committed. `services/origin` is origin A and origin B. `services/ads` is the SSAI stitcher. `services/license` answers Clear Key and holds the published lab key. `apps/web` plays the protected menus with Shaka. Android, iOS, and React Native are not created yet.
+The roadmap builds this tree. Today the repository contains `docs/`, this architecture, the root README, the MIT license, and the `pipeline/` commands. Those commands write the mezzanine, both menus, and the protected copy. The media files are build products and are not committed. `services/origin` is origin A and origin B. `services/ads` is the SSAI stitcher. `services/license` answers Clear Key and holds the published lab key. `apps/web` plays the protected menus with Shaka and clear HLS with hls.js. `apps/android` plays the encrypted DASH menu with Media3. iOS and React Native are not created yet.
 
 ```
 playpath-lab/
