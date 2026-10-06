@@ -15,10 +15,19 @@ struct PlaybackSnapshot {
     var isStalled = false
     var positionMs = 0
     var durationMs = 0
+    var adPlaying = false
     var height = 0
     var bandwidthBps = 0
     var error: String?
 }
+
+private enum AdPhase {
+    case off
+    case creative
+    case resume
+}
+
+private let creativeTimeoutNanoseconds: UInt64 = 5_000_000_000
 
 /// Plays a clear HLS URL and publishes engine state.
 ///
@@ -39,6 +48,18 @@ final class PlaybackSession {
     private var sessionId = ""
     private var recordedHeight = 0
     private var recordedBandwidth = 0
+    private var replaying = false
+    private var wantsPlayback = false
+    private var seekGeneration = 0
+    private var cueMs: Int?
+    private var creativeURL: URL?
+    private var filmCueMs: Int?
+    private var filmCueSeeked = false
+    private var adPlayed = false
+    private var adPhase = AdPhase.off
+    private var adAttempt = 0
+    private var creativeAssigned = false
+    private var creativeStarted = false
     private var timeObserver: Any?
     private var timeControlObservation: NSKeyValueObservation?
     private var itemStatusObservation: NSKeyValueObservation?
@@ -51,9 +72,9 @@ final class PlaybackSession {
         timeControlObservation = player.observe(\.timeControlStatus, options: [.new]) { [weak self] _, _ in
             self?.publish()
         }
-        let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
+        let interval = CMTime(seconds: 0.2, preferredTimescale: 600)
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] _ in
-            self?.publish()
+            self?.tick()
         }
     }
 
@@ -77,19 +98,39 @@ final class PlaybackSession {
         loadedURL = url
         didPlayToEnd = false
         seeking = false
+        replaying = false
+        wantsPlayback = true
+        seekGeneration += 1
         failureMessage = nil
         sessionId = UUID().uuidString
         recordedHeight = 0
         recordedBandwidth = 0
+        cueMs = nil
+        creativeURL = nil
+        filmCueMs = nil
+        filmCueSeeked = false
+        adPlayed = false
+        adPhase = .off
+        adAttempt += 1
+        creativeAssigned = false
+        creativeStarted = false
+        let attempt = adAttempt
         let item = AVPlayerItem(url: url)
         observe(item)
         player.replaceCurrentItem(with: item)
         player.play()
         publish()
+        readCue(attempt)
     }
 
     /// Resumes playback. After the item ends, or after a failed item, playback starts again.
     func play() {
+        wantsPlayback = true
+        if adPhase != .off {
+            player.play()
+            publish()
+            return
+        }
         if player.currentItem?.status == .failed, let loadedURL {
             play(url: loadedURL)
             return
@@ -97,30 +138,56 @@ final class PlaybackSession {
         if didPlayToEnd {
             didPlayToEnd = false
             seeking = false
-            player.seek(to: .zero)
+            replaying = true
+            player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
+                DispatchQueue.main.async {
+                    guard let self, finished else {
+                        return
+                    }
+                    if self.milliseconds(self.player.currentTime()) < 1_000 {
+                        self.replaying = false
+                    }
+                    self.publish()
+                }
+            }
+            player.play()
+            publish()
+            return
         }
         player.play()
         publish()
+        if atCue() {
+            playCreative()
+        }
     }
 
     /// Pauses playback.
     func pause() {
+        wantsPlayback = false
         player.pause()
         publish()
     }
 
     /// Seeks to `positionMs` on the film timeline.
     func seek(to positionMs: Int) {
-        let resumePlaying = player.timeControlStatus == .playing || seeking
+        if adPhase != .off {
+            return
+        }
+        seekGeneration += 1
+        let generation = seekGeneration
+        let resumePlaying = wantsPlayback || seeking
         seeking = resumePlaying
         didPlayToEnd = false
         let time = CMTime(seconds: Double(positionMs) / 1000, preferredTimescale: 1000)
         player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
             DispatchQueue.main.async {
-                guard let self, finished else {
+                guard let self, generation == self.seekGeneration else {
                     return
                 }
                 self.seeking = false
+                if finished, self.atCue() {
+                    self.playCreative()
+                }
                 self.publish()
             }
         }
@@ -137,18 +204,15 @@ final class PlaybackSession {
             forName: .AVPlayerItemDidPlayToEndTime,
             object: item,
             queue: .main
-        ) { [weak self] _ in
-            self?.didPlayToEnd = true
-            self?.seeking = false
-            self?.publish()
+        ) { [weak self] note in
+            self?.itemEnded(note.object as? AVPlayerItem)
         }
         failedObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemFailedToPlayToEndTime,
             object: item,
             queue: .main
-        ) { [weak self] _ in
-            self?.failureMessage = "Playback failed."
-            self?.publish()
+        ) { [weak self] note in
+            self?.itemFailed(note.object as? AVPlayerItem)
         }
         accessLogObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemNewAccessLogEntry,
@@ -185,15 +249,71 @@ final class PlaybackSession {
     }
 
     private func noteStatus(of item: AVPlayerItem) {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
+                self?.noteStatus(of: item)
+            }
+            return
+        }
+        guard item === player.currentItem else {
+            return
+        }
+        if item.status == .readyToPlay {
+            if adPhase == .creative {
+                creativeStarted = true
+            } else if adPhase == .resume {
+                arriveAtCue()
+            }
+        }
         if item.status == .failed {
+            if adPhase == .creative {
+                if creativeFailure() {
+                    resumeFilm()
+                }
+                return
+            }
+            if adPhase == .resume {
+                adPhase = .off
+            }
             failureMessage = "Playback failed."
         }
         publish()
     }
 
+    private func itemEnded(_ item: AVPlayerItem?) {
+        guard item === player.currentItem else {
+            return
+        }
+        if adPhase == .creative, creativeAssigned {
+            creativeStarted = true
+            resumeFilm()
+            return
+        }
+        didPlayToEnd = true
+        seeking = false
+        publish()
+    }
+
+    private func itemFailed(_ item: AVPlayerItem?) {
+        guard item === player.currentItem else {
+            return
+        }
+        if adPhase == .creative {
+            if creativeFailure() {
+                resumeFilm()
+            }
+            return
+        }
+        if adPhase == .resume {
+            adPhase = .off
+        }
+        failureMessage = "Playback failed."
+        publish()
+    }
+
     /// Records the rung `AVPlayer` chose. Controls do not read it and do not pick one.
     private func rememberVariant(of item: AVPlayerItem) {
-        guard item === player.currentItem else {
+        guard adPhase == .off, item === player.currentItem else {
             return
         }
         let bitrate = item.accessLog()?.events.last?.indicatedBitrate
@@ -234,6 +354,152 @@ final class PlaybackSession {
         print(line)
     }
 
+    private func tick() {
+        if replaying, milliseconds(player.currentTime()) < 1_000 {
+            replaying = false
+        }
+        if adPhase == .resume {
+            arriveAtCue()
+        } else if adPhase == .off, atCue() {
+            playCreative()
+        }
+        publish()
+    }
+
+    private func readCue(_ attempt: Int) {
+        Task { [weak self] in
+            let midroll = await fetchMidroll()
+            guard let self else {
+                return
+            }
+            await MainActor.run {
+                guard attempt == self.adAttempt, let midroll, let url = URL(string: midroll.mediaUrl) else {
+                    return
+                }
+                self.cueMs = midroll.cueMs
+                self.creativeURL = url
+            }
+        }
+    }
+
+    private func atCue() -> Bool {
+        if replaying || seeking || adPlayed || adPhase != .off {
+            return false
+        }
+        guard let cueMs, creativeURL != nil else {
+            return false
+        }
+        let ended = didPlayToEnd || player.currentItem?.status == .failed
+        return playingAtCue(
+            currentTimeMs: milliseconds(player.currentTime()),
+            cueMs: cueMs,
+            paused: !wantsPlayback,
+            ended: ended
+        )
+    }
+
+    private func creativeFailure() -> Bool {
+        guard creativeAssigned else {
+            return false
+        }
+        guard let item = player.currentItem else {
+            return true
+        }
+        let current = (item.asset as? AVURLAsset)?.url.absoluteString
+        return current == nil || current == creativeURL?.absoluteString
+    }
+
+    private func playCreative() {
+        guard !adPlayed, adPhase == .off, let creativeURL else {
+            return
+        }
+        adPlayed = true
+        adPhase = .creative
+        creativeAssigned = false
+        creativeStarted = false
+        let attempt = adAttempt
+        let item = AVPlayerItem(url: creativeURL)
+        observe(item)
+        player.replaceCurrentItem(with: item)
+        creativeAssigned = true
+        player.play()
+        failIfStuck(attempt, phase: .creative)
+        publish()
+    }
+
+    private func resumeFilm() {
+        guard adPhase == .creative else {
+            return
+        }
+        guard let loadedURL, let cueMs else {
+            adPhase = .off
+            failureMessage = "Playback failed."
+            publish()
+            return
+        }
+        adAttempt += 1
+        let attempt = adAttempt
+        // The player rate is already zero when the creative reaches its end.
+        let resumePlaying = wantsPlayback
+        adPhase = .resume
+        creativeAssigned = false
+        creativeStarted = false
+        filmCueMs = cueMs
+        filmCueSeeked = false
+        didPlayToEnd = false
+        seeking = false
+        let item = AVPlayerItem(url: loadedURL)
+        observe(item)
+        player.replaceCurrentItem(with: item)
+        if resumePlaying {
+            player.play()
+        } else {
+            player.pause()
+        }
+        failIfStuck(attempt, phase: .resume)
+        publish()
+    }
+
+    private func arriveAtCue() {
+        guard adPhase == .resume else {
+            return
+        }
+        let position = milliseconds(player.currentTime())
+        if let filmCueMs, !resumedAtCue(positionMs: position, cueMs: filmCueMs) {
+            if !filmCueSeeked, player.currentItem?.status == .readyToPlay {
+                filmCueSeeked = true
+                let time = CMTime(seconds: Double(filmCueMs) / 1000, preferredTimescale: 1000)
+                player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+            }
+            return
+        }
+        filmCueMs = nil
+        adPhase = .off
+    }
+
+    private func failIfStuck(_ attempt: Int, phase: AdPhase) {
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: creativeTimeoutNanoseconds)
+            guard let self else {
+                return
+            }
+            await MainActor.run {
+                guard attempt == self.adAttempt, self.adPhase == phase else {
+                    return
+                }
+                if phase == .creative, !self.creativeStarted {
+                    self.resumeFilm()
+                    return
+                }
+                if phase == .resume {
+                    self.adPhase = .off
+                    self.failureMessage = "Playback failed."
+                    self.publish()
+                }
+            }
+        }
+    }
+
     private func publish() {
         if !Thread.isMainThread {
             DispatchQueue.main.async { [weak self] in
@@ -247,6 +513,7 @@ final class PlaybackSession {
             isStalled: player.timeControlStatus == .waitingToPlayAtSpecifiedRate && !seeking,
             positionMs: milliseconds(player.currentTime()),
             durationMs: milliseconds(item?.duration ?? .indefinite),
+            adPlaying: adPhase != .off,
             height: recordedHeight,
             bandwidthBps: recordedBandwidth,
             error: failureMessage
@@ -258,6 +525,9 @@ final class PlaybackSession {
     private func playbackState() -> PlaybackState {
         if didPlayToEnd {
             return .ended
+        }
+        if player.timeControlStatus == .paused {
+            return .paused
         }
         if seeking {
             return .seeking

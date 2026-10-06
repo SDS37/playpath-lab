@@ -39,6 +39,9 @@ final class PlayerViewController: UIViewController {
         controls.onPause = { [weak self] in
             self?.session.pause()
         }
+        controls.onSeek = { [weak self] positionMs in
+            self?.session.seek(to: positionMs)
+        }
         backgroundObserver = NotificationCenter.default.addObserver(
             forName: UIScene.didEnterBackgroundNotification,
             object: nil,
