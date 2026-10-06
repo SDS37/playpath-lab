@@ -20,12 +20,17 @@ final class PlaybackControlsView: UIView {
     /// Called with a film position in milliseconds. Ignored while a creative is playing.
     var onSeek: ((Int) -> Void)?
 
+    /// Called with the next captions state. The session selects the menu text track.
+    var onCaptions: ((Bool) -> Void)?
+
     private let button = UIButton(type: .system)
+    private let captionsButton = UIButton(type: .system)
     private let seek = UISlider()
     private let timeLabel = UILabel()
     private let stallLabel = UILabel()
     private let errorLabel = UILabel()
     private var showsPause = false
+    private var captionsOn = true
     private var seekLocked = false
     private let barSpacing: CGFloat = 8
 
@@ -44,6 +49,9 @@ final class PlaybackControlsView: UIView {
         }
         button.configuration = configuration
         button.addTarget(self, action: #selector(tap), for: .touchUpInside)
+        captionsButton.configuration = configuration
+        captionsButton.addTarget(self, action: #selector(toggleCaptions), for: .touchUpInside)
+        captionsButton.configuration?.title = "Captions"
 
         seek.minimumTrackTintColor = PlayerColors.accent
         seek.maximumTrackTintColor = PlayerColors.text.withAlphaComponent(0.35)
@@ -67,7 +75,8 @@ final class PlaybackControlsView: UIView {
         errorLabel.numberOfLines = 0
         errorLabel.isHidden = true
 
-        let buttonRow = UIStackView(arrangedSubviews: [button, UIView()])
+        let buttonRow = UIStackView(arrangedSubviews: [button, captionsButton, UIView()])
+        buttonRow.spacing = barSpacing
         buttonRow.axis = .horizontal
         let stack = UIStackView(arrangedSubviews: [buttonRow, seek, timeLabel, stallLabel, errorLabel])
         stack.axis = .vertical
@@ -95,6 +104,9 @@ final class PlaybackControlsView: UIView {
         let title = showsPause ? "Pause" : "Play"
         button.configuration?.title = title
         button.accessibilityLabel = title
+        captionsOn = snapshot.captions
+        captionsButton.accessibilityLabel = "Captions"
+        captionsButton.accessibilityValue = snapshot.captions ? "on" : "off"
         seekLocked = snapshot.adPlaying
         let duration = max(snapshot.durationMs, 0)
         seek.isEnabled = !seekLocked && duration > 0
@@ -109,6 +121,10 @@ final class PlaybackControlsView: UIView {
         stallLabel.isHidden = !snapshot.isStalled
         errorLabel.text = snapshot.error
         errorLabel.isHidden = snapshot.error == nil
+    }
+
+    @objc private func toggleCaptions() {
+        onCaptions?(!captionsOn)
     }
 
     @objc private func tap() {

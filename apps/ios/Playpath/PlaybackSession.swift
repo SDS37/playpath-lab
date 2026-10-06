@@ -18,6 +18,8 @@ struct PlaybackSnapshot {
     var adPlaying = false
     var height = 0
     var bandwidthBps = 0
+    var captions = true
+    var caption = ""
     var error: String?
 }
 
@@ -62,6 +64,10 @@ final class PlaybackSession {
     private var creativeStarted = false
     private var startupLogged = false
     private var loadedAt = Date()
+    private var captions = true
+    private var captionText = ""
+    private var captionGeneration = 0
+    private let captionOutput = CaptionOutput()
     private var timeObserver: Any?
     private var timeControlObservation: NSKeyValueObservation?
     private var itemStatusObservation: NSKeyValueObservation?
@@ -71,6 +77,9 @@ final class PlaybackSession {
     private var presentationObservation: NSKeyValueObservation?
 
     init() {
+        captionOutput.onCues = { [weak self] text in
+            self?.noteCaption(text)
+        }
         timeControlObservation = player.observe(\.timeControlStatus, options: [.new]) { [weak self] _, _ in
             self?.publish()
         }
@@ -165,6 +174,18 @@ final class PlaybackSession {
         }
     }
 
+    /// Selects or clears the text track the menu already contains.
+    func setCaptions(_ enabled: Bool) {
+        captions = enabled
+        if !enabled {
+            captionText = ""
+        }
+        if adPhase != .creative, let item = player.currentItem {
+            selectCaptions(on: item)
+        }
+        publish()
+    }
+
     /// Pauses playback.
     func pause() {
         wantsPlayback = false
@@ -204,6 +225,10 @@ final class PlaybackSession {
         itemStatusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
             self?.noteStatus(of: item)
         }
+        let output = AVPlayerItemLegibleOutput()
+        output.suppressesPlayerRendering = true
+        output.setDelegate(captionOutput, queue: .main)
+        item.add(output)
         endObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
             object: item,
@@ -265,8 +290,11 @@ final class PlaybackSession {
         if item.status == .readyToPlay {
             if adPhase == .creative {
                 creativeStarted = true
-            } else if adPhase == .resume {
-                arriveAtCue()
+            } else {
+                selectCaptions(on: item)
+                if adPhase == .resume {
+                    arriveAtCue()
+                }
             }
         }
         if item.status == .failed {
@@ -409,6 +437,7 @@ final class PlaybackSession {
         }
         adPlayed = true
         adPhase = .creative
+        captionText = ""
         creativeAssigned = false
         creativeStarted = false
         let attempt = adAttempt
@@ -512,6 +541,8 @@ final class PlaybackSession {
             adPlaying: adPhase != .off,
             height: recordedHeight,
             bandwidthBps: recordedBandwidth,
+            captions: captions,
+            caption: adPhase == .off && captions ? captionText : "",
             error: failureMessage
         )
         snapshot = next
@@ -543,6 +574,46 @@ final class PlaybackSession {
         ))
     }
 
+    private func noteCaption(_ text: String) {
+        if adPhase == .creative || !captions || captionText == text {
+            return
+        }
+        captionText = text
+        publish()
+    }
+
+    private func selectCaptions(on item: AVPlayerItem) {
+        captionGeneration += 1
+        let generation = captionGeneration
+        let show = captions
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+            let group = try? await item.asset.loadMediaSelectionGroup(for: .legible)
+            guard generation == self.captionGeneration, self.player.currentItem === item else {
+                return
+            }
+            guard let group else {
+                return
+            }
+            if show, self.captions {
+                let english = group.options.first { option in
+                    option.extendedLanguageTag == "en" ||
+                        option.extendedLanguageTag == "eng" ||
+                        option.locale?.language.languageCode?.identifier == "en"
+                }
+                if let option = english ?? group.defaultOption ?? group.options.first {
+                    item.select(option, in: group)
+                }
+            } else {
+                item.select(nil, in: group)
+                self.captionText = ""
+                self.publish()
+            }
+        }
+    }
+
     private func playbackState() -> PlaybackState {
         if didPlayToEnd {
             return .ended
@@ -572,5 +643,18 @@ final class PlaybackSession {
             return 0
         }
         return Int((seconds * 1000).rounded())
+    }
+}
+
+private final class CaptionOutput: NSObject, AVPlayerItemLegibleOutputPushDelegate {
+    var onCues: ((String) -> Void)?
+
+    func legibleOutput(
+        _ output: AVPlayerItemLegibleOutput,
+        didOutputAttributedStrings strings: [NSAttributedString],
+        nativeSampleBuffers nativeSamples: [Any],
+        forItemTime itemTime: CMTime
+    ) {
+        onCues?(strings.map(\.string).joined(separator: "\n"))
     }
 }
