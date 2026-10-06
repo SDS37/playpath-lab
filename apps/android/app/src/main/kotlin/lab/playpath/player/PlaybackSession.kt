@@ -79,7 +79,7 @@ class PlaybackSession(
     private val sessionJob = SupervisorJob()
     private val scope = CoroutineScope(sessionJob + Dispatchers.Main.immediate)
     private val httpFactory = DefaultHttpDataSource.Factory().setUserAgent("playpath-android")
-    private val dashFactory = DashMediaSource.Factory(httpFactory)
+    private val dashFactory = DashMediaSource.Factory(BackupHttpDataSourceFactory(httpFactory))
         .setDrmSessionManagerProvider {
             val drmCallback = HttpMediaDrmCallback(CLEAR_KEY_LICENSE_URL, httpFactory)
             DefaultDrmSessionManager.Builder()

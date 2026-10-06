@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-// PlaybackSession is the backup base URL the player session reads.
-// The apps are not built yet. This is the configuration they will use.
+// PlaybackSession is the backup base URL named for the player session.
+// The web and Android sessions use these same two roots.
 type PlaybackSession struct {
 	BaseURL       string `json:"baseUrl"`
 	BackupBaseURL string `json:"backupBaseUrl"`
