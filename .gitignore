@@ -9,3 +9,7 @@ pipeline/protected/
 
 # Phase 5 pre-roll. Regenerate with ./pipeline/preroll.sh
 pipeline/preroll/
+
+# Web app build products
+apps/web/node_modules/
+apps/web/dist/
