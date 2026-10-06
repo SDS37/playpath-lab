@@ -10,6 +10,7 @@
     "format": "prettier --check ."
   },
   "dependencies": {
+    "hls.js": "1.7.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "shaka-player": "5.2.12"
