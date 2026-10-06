@@ -43,4 +43,4 @@ flowchart TD
 
 Shaka 5.2.12 does not parse the lab HLS key format. The session rewrites that playlist line to a key format Shaka does parse, maps it to `org.w3.clearkey`, and supplies a Clear Key init-data box built from the key id already in the playlist. The license request stays on the lab server.
 
-A stopped license, a black picture, and a `drm` playback event are later observations.
+On this page, a stopped license and a black picture are later observations. Android already shows that failure.
