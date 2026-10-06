@@ -450,6 +450,7 @@ final class PlaybackSession {
         player.replaceCurrentItem(with: item)
         creativeAssigned = true
         player.play()
+        logAd("impression")
         logAd("start")
         failIfStuck(attempt, phase: .creative)
         publish()
