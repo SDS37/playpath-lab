@@ -72,7 +72,7 @@ engine events → session state → props → controls
 controls → intents → session → engine methods
 ```
 
-A button does not import `shaka`. A button does not call `video.play()` on a DOM node it found with `querySelector`.
+A button does not import `shaka` or `Hls`. A button does not call `video.play()` on a DOM node it found with `querySelector`.
 
 ## Files
 
