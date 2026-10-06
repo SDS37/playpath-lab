@@ -10,6 +10,11 @@ import {
   drmEvent,
   startupEvent,
 } from "../../../apps/web/src/bitrateEvent";
+import {
+  bitrateEvent as mobileBitrateEvent,
+  drmEvent as mobileDrmEvent,
+  startupEvent as mobileStartupEvent,
+} from "../../../apps/mobile/src/playbackEvent";
 import { playbackEventErrors } from "./validate";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -155,6 +160,39 @@ describe("playback event schema", () => {
     expect(Number.isInteger(bitrate.positionMs)).toBe(true);
     expect(bitrate.height).toBe(720);
     expect(bitrate.bandwidthBps).toBe(2157897);
+  });
+
+  it("accepts a React Native startup, drm, and bitrate", () => {
+    const samples = [
+      mobileStartupEvent({
+        engine: "media3",
+        sessionId: "session",
+        at: "2026-10-06T09:00:00Z",
+        positionMs: 0,
+        startupMs: 840,
+        manifestUrl: "http://127.0.0.1:8080/manifest.mpd",
+      }),
+      mobileDrmEvent({
+        engine: "media3",
+        sessionId: "session",
+        at: "2026-10-06T09:00:00Z",
+        positionMs: 0,
+        result: "ok",
+        code: "",
+      }),
+      mobileBitrateEvent({
+        engine: "avplayer",
+        sessionId: "session",
+        at: "2026-10-06T09:00:10Z",
+        positionMs: 1000,
+        height: 720,
+        bandwidthBps: 2157897,
+      }),
+    ];
+    for (const line of samples) {
+      expect(playbackEventErrors(JSON.parse(line))).toEqual([]);
+      expect(line).not.toContain("ffefcdab");
+    }
   });
 
   it("keeps keys and license bodies out of the fixtures", () => {

@@ -240,7 +240,7 @@ sequenceDiagram
 
 ## 4. Repository layout
 
-The roadmap builds this tree. Today the repository contains `docs/`, this architecture, the root README, the MIT license, and the `pipeline/` commands. Those commands write the mezzanine, both menus, and the protected copy. The media files are build products and are not committed. `services/origin` is origin A and origin B. `services/ads` is the SSAI stitcher. `services/license` answers Clear Key and holds the published lab key. `apps/web` plays the protected menus with Shaka and clear HLS with hls.js. `apps/android` plays the encrypted DASH menu with Media3. `apps/ios` plays clear HLS with `AVPlayer`. React Native is not created yet.
+The roadmap builds this tree. Today the repository contains `docs/`, this architecture, the root README, the MIT license, and the `pipeline/` commands. Those commands write the mezzanine, both menus, and the protected copy. The media files are build products and are not committed. `services/origin` is origin A and origin B. `services/ads` is the SSAI stitcher. `services/license` answers Clear Key and holds the published lab key. `apps/web` plays the protected menus with Shaka and clear HLS with hls.js. `apps/android` plays the encrypted DASH menu with Media3. `apps/ios` plays clear HLS with `AVPlayer`. `apps/mobile` is the React Native app. It has not been observed playing.
 
 ```
 playpath-lab/
