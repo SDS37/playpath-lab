@@ -135,7 +135,7 @@ The mapper lives in the playback session. Controls do not translate engine codes
 
 ## Validation
 
-`packages/playback-events` will hold a JSON Schema for this document when M9 starts. Until then this file is the schema. A sample that adds a required-looking field under a new name, or that renames `startupMs`, fails review.
+`packages/playback-events` holds the JSON Schema for this document. Kotlin and Swift use that same file. A sample that adds a field under a new name, or that renames `startupMs`, fails validation.
 
 ## Privacy
 

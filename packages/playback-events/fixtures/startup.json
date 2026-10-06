@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "titleId": "playpath-bars",
+  "sessionId": "8f0c",
+  "platform": "web",
+  "engine": "shaka",
+  "event": "startup",
+  "at": "2026-10-04T12:00:00Z",
+  "positionMs": 0,
+  "startupMs": 840,
+  "manifestUrl": "http://127.0.0.1:8083/ssai/dash/manifest.mpd"
+}
