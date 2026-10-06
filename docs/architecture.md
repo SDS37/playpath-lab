@@ -161,7 +161,7 @@ The app asks an engine to play a URL. The engine fetches the menu, chooses the b
 
 Four engines means four failure modes. A bug in Media3 does not show up on iOS. That is why phase 10 uses one event shape.
 
-`apps/web` is the Chrome, Edge, and Firefox row. `npm run dev` listens on `http://127.0.0.1:5173`. The session loads either protected menu with Shaka, and clear HLS with hls.js from `http://127.0.0.1:8084/master.m3u8`. Play, pause, and seek go through that session. Controls do not import Shaka or hls.js. Safari uses the element for clear HLS and does not construct hls.js, including when hls.js also reports support. A play of that branch on Safari is not observed yet. `apps/android` is the Compose and Media3 row. It plays the encrypted DASH menu. `apps/ios` plays clear HLS with `AVPlayer`. The picture appears in UIKit, and that play does not call the license service.
+`apps/web` is the Chrome, Edge, and Firefox row. `npm run dev` listens on `http://127.0.0.1:5173`. The session loads either protected menu with Shaka, and clear HLS with hls.js from `http://127.0.0.1:8084/master.m3u8`. Play, pause, and seek go through that session. Controls do not import Shaka or hls.js. Safari uses the element for clear HLS and does not construct hls.js, including when hls.js also reports support. On Safari 26.6.2 that play shows the color bars and the control reaches 1:00 / 1:00. The playlist request comes from the media element, and the license log has no request from it. `apps/android` is the Compose and Media3 row. It plays the encrypted DASH menu. `apps/ios` plays clear HLS with `AVPlayer`. The picture appears in UIKit, and that play does not call the license service.
 
 ### Phase 7 — License
 
