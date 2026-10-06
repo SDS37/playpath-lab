@@ -13,3 +13,9 @@ pipeline/preroll/
 # Web app build products
 apps/web/node_modules/
 apps/web/dist/
+
+# Android build products
+apps/android/.gradle/
+apps/android/build/
+apps/android/app/build/
+apps/android/local.properties
