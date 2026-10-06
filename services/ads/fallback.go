@@ -9,8 +9,8 @@ import (
 )
 
 // FallbackSession is the clean menu loaded when the stitched menu fails.
-// The apps are not built yet. This choice does not request an impression,
-// and the ads service does not serve the clean menu.
+// The web and Android sessions use these same menus. This choice does not
+// request an impression, and the ads service does not serve the clean menu.
 type FallbackSession struct {
 	StitchedHLS  string `json:"stitchedHls"`
 	StitchedDASH string `json:"stitchedDash"`
