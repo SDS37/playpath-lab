@@ -317,6 +317,16 @@ class PlaybackSession(
         if (adPhase == AdPhase.Resume) {
             adPhase = AdPhase.Off
         }
+        val clean = if (manifestUrl == STITCHED_DASH) cleanMenu(STITCHED_DASH) else null
+        if (
+            adPhase == AdPhase.Off &&
+            clean != null &&
+            !startupLogged &&
+            error.errorCode !in DRM_ERROR_FIRST..DRM_ERROR_LAST
+        ) {
+            scope.launch { load(clean) }
+            return
+        }
         if (error.errorCode in DRM_ERROR_FIRST..DRM_ERROR_LAST) {
             reportDrm(error.errorCodeName)
         } else if (drmReported) {

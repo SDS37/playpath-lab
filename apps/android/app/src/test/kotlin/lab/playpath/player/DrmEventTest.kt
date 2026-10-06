@@ -99,6 +99,11 @@ class DrmEventTest {
         assertFalse(impression.contains("vast/impression"))
         assertEquals(10_000L, presentationCueMs(10_000L, DASH_MANIFEST))
         assertEquals(15_000L, presentationCueMs(10_000L, STITCHED_DASH))
+        assertEquals(DASH_MANIFEST, cleanMenu(STITCHED_DASH))
+        assertEquals(null, cleanMenu(DASH_MANIFEST))
+        assertEquals(null, cleanMenu("http://127.0.0.1:8083/vast/impression"))
+        assertFalse(DASH_MANIFEST.contains("vast/impression"))
+        assertFalse(DASH_MANIFEST.contains("8083"))
     }
 }
 
