@@ -12,6 +12,7 @@ pipeline/preroll/
 
 # Web app build products
 apps/web/node_modules/
+packages/playback-events/node_modules/
 apps/web/dist/
 
 # Android build products

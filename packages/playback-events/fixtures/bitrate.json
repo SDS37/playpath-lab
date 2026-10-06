@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "titleId": "playpath-bars",
+  "sessionId": "8f0c",
+  "platform": "ios",
+  "engine": "avplayer",
+  "event": "bitrate",
+  "at": "2026-10-04T12:00:02Z",
+  "positionMs": 4000,
+  "height": 720,
+  "bandwidthBps": 2157897,
+  "codecs": "avc1.64001f,mp4a.40.2"
+}

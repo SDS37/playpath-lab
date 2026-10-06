@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://playpath.lab/schemas/playback-event/v1.json",
+  "title": "PlayPath playback event, version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "titleId",
+    "sessionId",
+    "platform",
+    "engine",
+    "event",
+    "at",
+    "positionMs"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "titleId": { "const": "playpath-bars" },
+    "sessionId": { "type": "string", "minLength": 1 },
+    "platform": { "enum": ["web", "android", "ios", "react-native"] },
+    "engine": { "enum": ["shaka", "hlsjs", "media3", "avplayer"] },
+    "event": {
+      "enum": ["startup", "state", "stalled", "bitrate", "ad", "drm", "error"]
+    },
+    "at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|\\+00:00)$"
+    },
+    "positionMs": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Media time of the film when the event happened, in milliseconds. 0 if playback never started."
+    },
+    "extra": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "startupMs": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Milliseconds from the load call to the first frame."
+    },
+    "manifestUrl": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^https?://[^@?\\s]+$",
+      "description": "The URL the engine was given, without query credentials."
+    },
+    "playbackState": { "enum": ["playing", "paused", "seeking", "ended"] },
+    "stallMs": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "How long the stall lasted, in milliseconds, once it ends."
+    },
+    "started": { "type": "boolean" },
+    "height": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "description": "Video height in pixels."
+    },
+    "bandwidthBps": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "description": "Bandwidth in bits per second."
+    },
+    "codecs": { "type": "string", "minLength": 1 },
+    "breakId": { "enum": ["preroll", "midroll"] },
+    "mode": { "enum": ["ssai", "csai"] },
+    "action": { "enum": ["start", "impression", "complete", "error"] },
+    "keySystem": {
+      "enum": [
+        "org.w3.clearkey",
+        "com.widevine.alpha",
+        "com.microsoft.playready",
+        "com.apple.fps"
+      ]
+    },
+    "result": { "enum": ["ok", "error"] },
+    "code": { "type": "string" },
+    "phase": { "enum": [4, 5, 7, 8] },
+    "message": { "type": "string", "minLength": 1 }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "event": { "const": "startup" } },
+        "required": ["event"]
+      },
+      "then": {
+        "properties": { "startupMs": true, "manifestUrl": true },
+        "required": ["startupMs", "manifestUrl"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "event": { "const": "state" } },
+        "required": ["event"]
+      },
+      "then": {
+        "properties": { "playbackState": true },
+        "required": ["playbackState"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "event": { "const": "stalled" } },
+        "required": ["event"]
+      },
+      "then": {
+        "properties": { "started": true },
+        "required": ["started"],
+        "if": {
+          "properties": { "started": { "const": false } },
+          "required": ["started"]
+        },
+        "then": {
+          "properties": { "stallMs": true },
+          "required": ["stallMs"]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "event": { "const": "ad" } },
+        "required": ["event"]
+      },
+      "then": {
+        "properties": { "breakId": true, "mode": true, "action": true },
+        "required": ["breakId", "mode", "action"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "event": { "const": "drm" } },
+        "required": ["event"]
+      },
+      "then": {
+        "properties": { "keySystem": true, "result": true, "code": true },
+        "required": ["keySystem", "result", "code"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "event": { "const": "error" } },
+        "required": ["event"]
+      },
+      "then": {
+        "properties": { "phase": true, "message": true },
+        "required": ["phase", "message"]
+      }
+    }
+  ]
+}
