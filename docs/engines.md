@@ -47,7 +47,7 @@ Primary sources: [AVPlayer](https://developer.apple.com/documentation/avfoundati
 
 Swift creates an `AVPlayer` with the HLS URL, observes `timeControlStatus`, and uses the item’s access log when a variant change needs to be reported. Play, pause, and seek are calls on the player. The view layer or player view controller’s view shows frames. Transport controls are UIKit views we own.
 
-FairPlay, when a certificate exists, is an `AVContentKeySession` attached to the asset, as [FairPlay Streaming](https://developer.apple.com/streaming/fps/) describes. Until then the iOS happy path is clear HLS, and the session type keeps a single place where that key session will be created.
+FairPlay, when a certificate exists, is an `AVContentKeySession` attached to the asset, as [FairPlay Streaming](https://developer.apple.com/streaming/fps/) describes. Until then the iOS happy path is clear HLS, and the session type keeps a single place where that key session will be created. `apps/ios` does not create that session. On an iOS 27 simulator the clear menu shows the color bars, the control reads Pause, and a later frame of the same picture has changed. That play does not appear in the license log.
 
 ## React Native
 
