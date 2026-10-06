@@ -193,6 +193,9 @@ final class PlaybackSession {
 
     /// Records the rung `AVPlayer` chose. Controls do not read it and do not pick one.
     private func rememberVariant(of item: AVPlayerItem) {
+        guard item === player.currentItem else {
+            return
+        }
         let bitrate = item.accessLog()?.events.last?.indicatedBitrate
         let bandwidth = bitrate.map { value -> Int in
             guard value.isFinite, value > 0 else {
@@ -220,7 +223,7 @@ final class PlaybackSession {
         var line = "{\"version\":1,\"titleId\":\"playpath-bars\""
         line += ",\"sessionId\":\"\(sessionId)\",\"platform\":\"ios\",\"engine\":\"avplayer\""
         line += ",\"event\":\"bitrate\",\"at\":\"\(clock.string(from: Date()))\""
-        line += ",\"positionMs\":\(snapshot.positionMs)"
+        line += ",\"positionMs\":\(milliseconds(player.currentTime()))"
         if height > 0 {
             line += ",\"height\":\(height)"
         }
