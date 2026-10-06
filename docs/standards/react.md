@@ -38,7 +38,7 @@ type ControlsProps = {
 };
 
 export function Controls({ playbackState, onPlay, onPause }: ControlsProps) {
-  const showPause = playbackState === "playing";
+  const showPause = playbackState === "playing" || playbackState === "seeking";
   return (
     <button type="button" className="control" onClick={showPause ? onPause : onPlay}>
       {showPause ? "Pause" : "Play"}
@@ -80,8 +80,10 @@ A button does not import `shaka`. A button does not call `video.play()` on a DOM
 |---|---|
 | `PlaybackSession.ts` | Engine lifetime and intents. No JSX |
 | `usePlaybackSession.ts` | Hook that subscribes React to the session |
-| `Controls.tsx` | Bar |
-| `PlayerScreen.tsx` | Media element, bar, error text |
+| `Controls.tsx` | Bar, time, seek, stall, and error text |
+| `PlayerScreen.tsx` | Media element, menu, and bar |
+
+The web app’s tree, and the responsibility of each of these files, is in [the web README](../../apps/web/README.md#page-structure).
 
 ## Tooling
 

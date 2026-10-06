@@ -17,9 +17,9 @@ Which engine plays `playpath-bars` on which device, and the official way that en
 
 Primary tutorial: [Welcome](https://shaka-project.github.io/shaka-player/docs/api/tutorial-welcome.html) and [basic usage](https://shaka-project.github.io/shaka-player/docs/api/tutorial-basic-usage.html). DRM configuration: the player’s DRM tutorial in the same manual.
 
-The page installs the polyfills Shaka requires, constructs `shaka.Player` on a media element, attaches an error listener, then `load`s a manifest URI. Clear Key is a DRM server entry for `org.w3.clearkey` pointing at `http://127.0.0.1:8082/`. The application reads `error` and adaptation events and maps them into [playback events](playback-events.md). It does not read key material out of the EME session.
+The page installs the polyfills Shaka requires, constructs `shaka.Player` on a media element, attaches an error listener, then `load`s a manifest URI. Clear Key is a DRM server entry for `org.w3.clearkey` pointing at `http://127.0.0.1:8082/`. The application does not read key material out of the EME session. Mapping `error` and adaptation events into [playback events](playback-events.md) waits for the monitor.
 
-Shaka is the web player whenever the title is encrypted, whether the menu is DASH or HLS.
+Shaka is the web player whenever the title is encrypted, whether the menu is DASH or HLS. Shaka 5.2.12 does not parse the lab HLS key format `urn:uuid:e2719d58-a985-b3c9-781a-b030af78d30e`. The web session rewrites that playlist line to the key format Shaka does parse, maps `com.widevine.alpha` to `org.w3.clearkey`, and puts a Clear Key init-data box in the data URI. The box is built from the key id already in the playlist. The content key stays out of the page, and the license request stays on `http://127.0.0.1:8082/`.
 
 ## hls.js
 

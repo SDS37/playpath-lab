@@ -1,0 +1,88 @@
+.player {
+  --background: #111111;
+  --control: #1e1e1e;
+  --text: #f4f4f4;
+  --accent: #8eb6ff;
+  --danger: #ffb4b4;
+  background: var(--background);
+  color: var(--text);
+  min-height: 100vh;
+  margin: 0;
+  padding: 1rem;
+  font-family: system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+.picture {
+  display: block;
+  width: 100%;
+  max-width: 64rem;
+  background: var(--background);
+}
+
+.menus {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.control-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  max-width: 64rem;
+  background: var(--control);
+}
+
+.control-bar::after {
+  content: "";
+  flex: 0 0 var(--progress);
+  height: 0.25rem;
+  background: var(--accent);
+}
+
+.control {
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--text);
+  font: inherit;
+  padding: 0.4rem 0.8rem;
+}
+
+.control:focus-visible,
+.seek:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.seek {
+  flex: 1 1 12rem;
+  accent-color: var(--accent);
+}
+
+.time,
+.stall {
+  color: var(--text);
+}
+
+.error {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--danger);
+}
+
+.control[aria-pressed="true"] {
+  border-color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .control-bar::after {
+    transition: none;
+  }
+}

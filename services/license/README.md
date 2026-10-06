@@ -14,4 +14,4 @@ That listens on `http://127.0.0.1:8082`. `POST /` with a Clear Key license reque
 
 An unknown key id, or a request that is not that JSON, gets a non-success status. The body does not name the clear package, and the response has no `Location` header. `GET` is `405`. Any other path, including `/master.m3u8`, is `404`. The log line is the method, the path, the status, and the key id. It does not include the key.
 
-A page on `http://127.0.0.1:5173` can read the response. Other origins do not get that header. Stopping this process is the license-down case. A black picture and a `drm` error still wait for an app, as does Media3 calling this URL.
+A page on `http://127.0.0.1:5173` can read the response. Other origins do not get that header. The web app calls this URL through Shaka. Stopping this process is the license-down case. A black picture and a `drm` error still wait, as does Media3 calling this URL.

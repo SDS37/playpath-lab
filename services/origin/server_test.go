@@ -63,8 +63,8 @@ func TestResponses(t *testing.T) {
 			if rec.Code != tt.status {
 				t.Fatalf("status %d, want %d", rec.Code, tt.status)
 			}
-			if tt.status == http.StatusMethodNotAllowed && rec.Header().Get("Allow") != "GET, HEAD" {
-				t.Fatalf("Allow %q, want %q", rec.Header().Get("Allow"), "GET, HEAD")
+			if tt.status == http.StatusMethodNotAllowed && rec.Header().Get("Allow") != "GET, HEAD, OPTIONS" {
+				t.Fatalf("Allow %q, want %q", rec.Header().Get("Allow"), "GET, HEAD, OPTIONS")
 			}
 			if tt.ctype != "" && rec.Header().Get("Content-Type") != tt.ctype {
 				t.Fatalf("content type %q, want %q", rec.Header().Get("Content-Type"), tt.ctype)
@@ -76,6 +76,55 @@ func TestResponses(t *testing.T) {
 				t.Fatal("response included the content key or the mezzanine")
 			}
 		})
+	}
+}
+
+func TestWebOriginCanReadAMenu(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "manifest.mpd"), []byte("<MPD></MPD>\n"))
+	mustWrite(t, filepath.Join(dir, "lab-key.json"), []byte(`{"key":"secret"}`))
+	handler, err := New(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	preflight := httptest.NewRequest(http.MethodOptions, "http://127.0.0.1:8080/manifest.mpd", nil)
+	preflight.Header.Set("Origin", webOrigin)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, preflight)
+	if rec.Code != http.StatusNoContent || rec.Header().Get("Access-Control-Allow-Origin") != webOrigin || rec.Header().Get("Vary") != "Origin" {
+		t.Fatalf("preflight %d origin %q vary %q", rec.Code, rec.Header().Get("Access-Control-Allow-Origin"), rec.Header().Get("Vary"))
+	}
+
+	get := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8080/manifest.mpd", nil)
+	get.Header.Set("Origin", webOrigin)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, get)
+	if rec.Code != http.StatusOK || rec.Header().Get("Access-Control-Allow-Origin") != webOrigin || rec.Header().Get("Vary") != "Origin" {
+		t.Fatalf("get %d origin %q vary %q", rec.Code, rec.Header().Get("Access-Control-Allow-Origin"), rec.Header().Get("Vary"))
+	}
+
+	other := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8080/manifest.mpd", nil)
+	other.Header.Set("Origin", "http://example.test")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, other)
+	if rec.Header().Get("Access-Control-Allow-Origin") != "" || rec.Header().Get("Vary") != "Origin" {
+		t.Fatalf("unexpected origin %q vary %q", rec.Header().Get("Access-Control-Allow-Origin"), rec.Header().Get("Vary"))
+	}
+
+	plain := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8080/manifest.mpd", nil)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, plain)
+	if rec.Header().Get("Access-Control-Allow-Origin") != "" || rec.Header().Get("Vary") != "Origin" {
+		t.Fatalf("plain origin %q vary %q", rec.Header().Get("Access-Control-Allow-Origin"), rec.Header().Get("Vary"))
+	}
+
+	hidden := httptest.NewRequest(http.MethodOptions, "http://127.0.0.1:8080/lab-key.json", nil)
+	hidden.Header.Set("Origin", webOrigin)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, hidden)
+	if rec.Code != http.StatusNotFound || strings.Contains(rec.Body.String(), "secret") {
+		t.Fatalf("hidden preflight %d", rec.Code)
 	}
 }
 
