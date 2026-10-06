@@ -56,6 +56,36 @@ class DrmEventTest {
         assertEquals("2164878", field(event, "bandwidthBps"))
         assertFalse(event.contains("ffefcdab"))
     }
+
+    @Test
+    fun `startup and the mid-roll use the same field names and omit credentials`() {
+        val startup = startupEvent(
+            sessionId = "session",
+            at = "2026-10-06T09:00:00Z",
+            positionMs = 0,
+            startupMs = 840,
+            manifestUrl = "http://user:pass@127.0.0.1:8080/manifest.mpd?k=ffefcdab",
+        )
+        assertEquals("startup", field(startup, "event"))
+        assertEquals("android", field(startup, "platform"))
+        assertEquals("media3", field(startup, "engine"))
+        assertEquals("840", field(startup, "startupMs"))
+        assertEquals("http://127.0.0.1:8080/manifest.mpd", field(startup, "manifestUrl"))
+        assertFalse(startup.contains("ffefcdab"))
+        assertFalse(startup.contains("user:pass"))
+        val ad = adEvent(
+            sessionId = "session",
+            at = "2026-10-06T09:00:10Z",
+            positionMs = 10_000,
+            action = "start",
+        )
+        assertEquals("ad", field(ad, "event"))
+        assertEquals("midroll", field(ad, "breakId"))
+        assertEquals("csai", field(ad, "mode"))
+        assertEquals("start", field(ad, "action"))
+        assertEquals("10000", field(ad, "positionMs"))
+        assertFalse(ad.contains("ffefcdab"))
+    }
 }
 
 private fun field(json: String, name: String): String {

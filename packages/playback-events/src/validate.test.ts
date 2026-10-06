@@ -4,6 +4,12 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import schema from "../schema/playback-event.v1.json" with { type: "json" };
 import startup from "../fixtures/startup.json" with { type: "json" };
+import {
+  adEvent,
+  bitrateEvent,
+  drmEvent,
+  startupEvent,
+} from "../../../apps/web/src/bitrateEvent";
 import { playbackEventErrors } from "./validate";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -33,6 +39,62 @@ describe("playback event schema", () => {
     }
   });
 
+  it("accepts startup and ad from web, Android, and iOS", () => {
+    const samples = [
+      startupEvent({
+        engine: "shaka",
+        sessionId: "session",
+        at: "2026-10-06T09:00:00Z",
+        positionMs: 0,
+        startupMs: 840,
+        manifestUrl: "http://127.0.0.1:8080/manifest.mpd",
+      }),
+      adEvent({
+        engine: "shaka",
+        sessionId: "session",
+        at: "2026-10-06T09:00:10Z",
+        positionMs: 10000,
+        action: "start",
+      }),
+      drmEvent({
+        engine: "shaka",
+        sessionId: "session",
+        at: "2026-10-06T09:00:00Z",
+        positionMs: 0,
+        result: "ok",
+        code: "",
+      }),
+      bitrateEvent({
+        engine: "hlsjs",
+        sessionId: "session",
+        at: "2026-10-06T09:00:04Z",
+        positionMs: 4000,
+        height: 720,
+        bandwidthBps: 2157897,
+        codecs: "avc1.64001f,mp4a.40.2",
+      }),
+      fixture("android-startup.json"),
+      fixture("android-ad.json"),
+      fixture("ios-startup.json"),
+      fixture("ios-ad.json"),
+    ];
+    for (const sample of samples) {
+      const event = typeof sample === "string" ? JSON.parse(sample) : sample;
+      expect(playbackEventErrors(event)).toEqual([]);
+    }
+    const webStartup = JSON.parse(samples[0] as string) as Record<
+      string,
+      unknown
+    >;
+    const names = (event: Record<string, unknown>) => Object.keys(event).sort();
+    expect(names(webStartup)).toEqual(
+      names(fixture("android-startup.json") as Record<string, unknown>),
+    );
+    expect(names(webStartup)).toEqual(
+      names(fixture("ios-startup.json") as Record<string, unknown>),
+    );
+  });
+
   it("rejects a startup that renames startupMs", () => {
     const renamed: Record<string, unknown> = {
       ...startup,
@@ -57,9 +119,7 @@ describe("playback event schema", () => {
       at: "2026-10-04T12:00:00Z",
       positionMs: 0,
     };
-    expect(
-      playbackEventErrors({ ...envelope, started: true }),
-    ).toEqual([]);
+    expect(playbackEventErrors({ ...envelope, started: true })).toEqual([]);
     expect(
       playbackEventErrors({ ...envelope, started: true, stallMs: 10 }).length,
     ).toBeGreaterThan(0);

@@ -1,6 +1,13 @@
 import Hls from "hls.js";
 import shaka from "shaka-player";
-import { bitrateEvent, type BitrateEngine } from "./bitrateEvent";
+import {
+  adEvent,
+  bitrateEvent,
+  drmCodeOf,
+  drmEvent,
+  startupEvent,
+  type BitrateEngine,
+} from "./bitrateEvent";
 import { chooseEngine } from "./chooseEngine";
 import { clearKeyLicenseUrl, drmServers } from "./drmServers";
 import { rewriteClearKeyPlaylist } from "./hlsClearKey";
@@ -67,9 +74,15 @@ export class PlaybackSession {
   #creativeAssigned = false;
   #creativeStarted = false;
   #playWhenReady = false;
+  #loadStartedMs = 0;
+  #startupLogged = false;
+  #drmLogged = false;
   #bound = false;
   #listeners = new Set<(snapshot: PlaybackSnapshot) => void>();
   #snapshot: PlaybackSnapshot = initialSnapshot;
+  #onPlaying = (): void => {
+    this.#noteStartup();
+  };
   #onVideo = (): void => {
     if (this.#adPhase === "resume") {
       return;
@@ -142,6 +155,9 @@ export class PlaybackSession {
     this.#generation += 1;
     const generation = this.#generation;
     this.#sessionId = crypto.randomUUID();
+    this.#loadStartedMs = performance.now();
+    this.#startupLogged = false;
+    this.#drmLogged = false;
     this.#shakaBuffering = false;
     this.#manifestUrl = manifestUrl;
     this.#engine = undefined;
@@ -377,6 +393,7 @@ export class PlaybackSession {
     for (const name of videoEvents) {
       this.#video.addEventListener(name, this.#onVideo);
     }
+    this.#video.addEventListener("playing", this.#onPlaying);
   }
 
   #unbindVideo(): void {
@@ -387,6 +404,7 @@ export class PlaybackSession {
     for (const name of videoEvents) {
       this.#video.removeEventListener(name, this.#onVideo);
     }
+    this.#video.removeEventListener("playing", this.#onPlaying);
   }
 
   #noteShaka(player: shaka.Player): void {
@@ -428,16 +446,66 @@ export class PlaybackSession {
       height: nextHeight,
       bandwidthBps: nextBandwidth,
     });
-    const at = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
     console.info(
       bitrateEvent({
         engine,
         sessionId: this.#sessionId,
-        at,
+        at: utcNow(),
         positionMs: Math.round(this.#video.currentTime * 1000),
         height: nextHeight,
         bandwidthBps: nextBandwidth,
         codecs,
+      }),
+    );
+  }
+
+  #noteStartup(): void {
+    if (this.#startupLogged || this.#adPhase !== "off") {
+      return;
+    }
+    const engine = this.#engine;
+    if (engine !== "shaka" && engine !== "hlsjs") {
+      return;
+    }
+    this.#startupLogged = true;
+    const positionMs = Math.round(this.#video.currentTime * 1000);
+    console.info(
+      startupEvent({
+        engine,
+        sessionId: this.#sessionId,
+        at: utcNow(),
+        positionMs,
+        startupMs: performance.now() - this.#loadStartedMs,
+        manifestUrl: this.#manifestUrl,
+      }),
+    );
+    if (engine === "shaka" && !this.#drmLogged) {
+      this.#drmLogged = true;
+      console.info(
+        drmEvent({
+          engine,
+          sessionId: this.#sessionId,
+          at: utcNow(),
+          positionMs,
+          result: "ok",
+          code: "",
+        }),
+      );
+    }
+  }
+
+  #logAd(action: "start" | "complete" | "error"): void {
+    const engine = this.#engine;
+    if (engine !== "shaka" && engine !== "hlsjs") {
+      return;
+    }
+    console.info(
+      adEvent({
+        engine,
+        sessionId: this.#sessionId,
+        at: utcNow(),
+        positionMs: this.#cueMs ?? 0,
+        action,
       }),
     );
   }
@@ -521,6 +589,7 @@ export class PlaybackSession {
       }
       this.#creativeStarted = true;
       this.#publishFromVideo();
+      this.#logAd("start");
       await this.#video.play();
     } catch {
       if (!this.#ownsCreative(generation, attempt)) {
@@ -542,6 +611,7 @@ export class PlaybackSession {
     if (this.#adPhase !== "creative") {
       return;
     }
+    this.#logAd(this.#creativeStarted ? "complete" : "error");
     this.#adAttempt += 1;
     this.#adPhase = "resume";
     this.#creativeAssigned = false;
@@ -650,10 +720,23 @@ export class PlaybackSession {
   }
 
   #fail(err: unknown): void {
-    const message =
-      categoryOf(err) === shaka.util.Error.Category.DRM
-        ? "The title cannot be played."
-        : "Playback failed.";
+    const drmFailed = categoryOf(err) === shaka.util.Error.Category.DRM;
+    if (drmFailed && this.#engine === "shaka" && !this.#drmLogged) {
+      this.#drmLogged = true;
+      console.info(
+        drmEvent({
+          engine: "shaka",
+          sessionId: this.#sessionId,
+          at: utcNow(),
+          positionMs: Math.round(this.#video.currentTime * 1000),
+          result: "error",
+          code: drmCodeOf(err),
+        }),
+      );
+    }
+    const message = drmFailed
+      ? "The title cannot be played."
+      : "Playback failed.";
     this.#set({
       ...this.#snapshot,
       adPlaying: this.#adPhase !== "off",
@@ -667,6 +750,10 @@ export class PlaybackSession {
       listener(snapshot);
     }
   }
+}
+
+function utcNow(): string {
+  return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
 function stateOf(video: HTMLVideoElement): PlaybackState {
