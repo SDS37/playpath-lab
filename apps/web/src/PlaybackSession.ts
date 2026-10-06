@@ -47,6 +47,7 @@ export class PlaybackSession {
   #nativeGeneration = 0;
   #generation = 0;
   #sessionId = "";
+  #shakaBuffering = false;
   #bound = false;
   #listeners = new Set<(snapshot: PlaybackSnapshot) => void>();
   #snapshot: PlaybackSnapshot = initialSnapshot;
@@ -85,6 +86,7 @@ export class PlaybackSession {
     this.#generation += 1;
     const generation = this.#generation;
     this.#sessionId = crypto.randomUUID();
+    this.#shakaBuffering = false;
     await this.#releasePlayer();
     if (generation !== this.#generation) {
       return;
@@ -180,7 +182,8 @@ export class PlaybackSession {
         if (generation !== this.#generation) {
           return;
         }
-        this.#set({ ...this.#snapshot, stalled: isBuffering(event) });
+        this.#shakaBuffering = isBuffering(event);
+        this.#publishFromVideo();
       });
       player.addEventListener("adaptation", () => {
         if (generation !== this.#generation) {
@@ -352,8 +355,9 @@ export class PlaybackSession {
       ...this.#snapshot,
       playbackState: stateOf(this.#video),
       stalled:
-        this.#video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA &&
-        !this.#video.paused,
+        this.#shakaBuffering ||
+        (this.#video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA &&
+          !this.#video.paused),
       positionMs: Math.round(this.#video.currentTime * 1000),
       durationMs: Number.isFinite(duration) ? Math.round(duration * 1000) : 0,
     });
