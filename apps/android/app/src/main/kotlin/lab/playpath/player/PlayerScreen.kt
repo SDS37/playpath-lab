@@ -75,6 +75,10 @@ fun PlayerScreen() {
             onClick = { selectManifest(DASH_MANIFEST) },
         )
         MenuButton(
+            label = "Stitched",
+            onClick = { selectManifest(STITCHED_DASH) },
+        )
+        MenuButton(
             label = "Wrong key",
             onClick = { selectManifest(WRONG_KEY_MANIFEST) },
         )

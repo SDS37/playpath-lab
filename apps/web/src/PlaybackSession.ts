@@ -13,6 +13,7 @@ import { chooseEngine } from "./chooseEngine";
 import { clearKeyLicenseUrl, drmServers } from "./drmServers";
 import { rewriteClearKeyPlaylist } from "./hlsClearKey";
 import { fetchMidroll, playingAtCue } from "./midroll";
+import { isStitched, presentationCueMs, stitchedLeadMs } from "./stitchedMenu";
 
 export type PlaybackState = "playing" | "paused" | "seeking" | "ended";
 
@@ -102,6 +103,7 @@ export class PlaybackSession {
   #loadStartedMs = 0;
   #firstFrameMs: number | undefined = undefined;
   #startupLogged = false;
+  #stitchedImpressionLogged = false;
   #drmLogged = false;
   #bound = false;
   #listeners = new Set<(snapshot: PlaybackSnapshot) => void>();
@@ -121,6 +123,7 @@ export class PlaybackSession {
       void this.#playCreative();
       return;
     }
+    this.#noteFilmKeys();
     this.#publishFromVideo();
   };
   #onCreativeError = (): void => {
@@ -206,6 +209,7 @@ export class PlaybackSession {
     this.#loadStartedMs = performance.now();
     this.#firstFrameMs = undefined;
     this.#startupLogged = false;
+    this.#stitchedImpressionLogged = false;
     this.#drmLogged = false;
     this.#shakaBuffering = false;
     this.#manifestUrl = manifestUrl;
@@ -682,42 +686,88 @@ export class PlaybackSession {
   }
 
   #noteStartup(): void {
-    if (this.#startupLogged || this.#adPhase !== "off") {
+    if (this.#adPhase !== "off") {
       return;
     }
     const engine = this.#engine;
     if (engine !== "shaka" && engine !== "hlsjs") {
       return;
     }
-    this.#startupLogged = true;
     const positionMs = Math.round(this.#video.currentTime * 1000);
-    const frameAt = this.#firstFrameMs ?? performance.now();
-    console.info(
-      startupEvent({
-        engine,
-        sessionId: this.#sessionId,
-        at: utcNow(),
-        positionMs,
-        startupMs: frameAt - this.#loadStartedMs,
-        manifestUrl: this.#manifestUrl,
-      }),
-    );
-    if (engine === "shaka" && !this.#drmLogged) {
-      this.#drmLogged = true;
+    if (!this.#startupLogged) {
+      this.#startupLogged = true;
+      const frameAt = this.#firstFrameMs ?? performance.now();
       console.info(
-        drmEvent({
+        startupEvent({
           engine,
           sessionId: this.#sessionId,
           at: utcNow(),
           positionMs,
-          result: "ok",
-          code: "",
+          startupMs: frameAt - this.#loadStartedMs,
+          manifestUrl: this.#manifestUrl,
         }),
       );
+      this.#logStitchedImpression(engine, positionMs);
+    }
+    // The stitched pre-roll is clear. A drm ok belongs to the film period.
+    if (
+      engine === "shaka" &&
+      !this.#drmLogged &&
+      !isStitched(this.#manifestUrl)
+    ) {
+      this.#logDrmOk(positionMs);
     }
   }
 
-  #logAd(action: "start" | "complete" | "error"): void {
+  #noteFilmKeys(): void {
+    if (
+      this.#drmLogged ||
+      this.#engine !== "shaka" ||
+      this.#adPhase !== "off" ||
+      !isStitched(this.#manifestUrl)
+    ) {
+      return;
+    }
+    const positionMs = Math.round(this.#video.currentTime * 1000);
+    if (positionMs < stitchedLeadMs) {
+      return;
+    }
+    this.#logDrmOk(positionMs);
+  }
+
+  #logDrmOk(positionMs: number): void {
+    this.#drmLogged = true;
+    console.info(
+      drmEvent({
+        engine: "shaka",
+        sessionId: this.#sessionId,
+        at: utcNow(),
+        positionMs,
+        result: "ok",
+        code: "",
+      }),
+    );
+  }
+
+  #logStitchedImpression(engine: BitrateEngine, positionMs: number): void {
+    if (this.#stitchedImpressionLogged || !isStitched(this.#manifestUrl)) {
+      return;
+    }
+    this.#stitchedImpressionLogged = true;
+    console.info(
+      adEvent({
+        engine,
+        sessionId: this.#sessionId,
+        at: utcNow(),
+        positionMs,
+        action: "impression",
+        breakId: "preroll",
+        mode: "ssai",
+      }),
+    );
+  }
+
+  #logAd(action: "start" | "impression" | "complete" | "error"): void {
     const engine = this.#engine;
     if (engine !== "shaka" && engine !== "hlsjs") {
       return;
@@ -754,7 +804,7 @@ export class PlaybackSession {
     if (generation !== this.#generation || midroll === undefined) {
       return;
     }
-    this.#cueMs = midroll.cueMs;
+    this.#cueMs = presentationCueMs(midroll.cueMs, this.#manifestUrl);
     this.#creativeUrl = midroll.mediaUrl;
   }
 
@@ -816,6 +866,7 @@ export class PlaybackSession {
       if (!this.#ownsCreative(generation, attempt)) {
         return;
       }
+      this.#logAd("impression");
       this.#logAd("start");
     } catch {
       if (!this.#ownsCreative(generation, attempt)) {

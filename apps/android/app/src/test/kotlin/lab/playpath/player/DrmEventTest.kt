@@ -85,6 +85,20 @@ class DrmEventTest {
         assertEquals("start", field(ad, "action"))
         assertEquals("10000", field(ad, "positionMs"))
         assertFalse(ad.contains("ffefcdab"))
+        val impression = adEvent(
+            sessionId = "session",
+            at = "2026-10-06T09:00:00Z",
+            positionMs = 0,
+            action = "impression",
+            breakId = "preroll",
+            mode = "ssai",
+        )
+        assertEquals("preroll", field(impression, "breakId"))
+        assertEquals("ssai", field(impression, "mode"))
+        assertEquals("impression", field(impression, "action"))
+        assertFalse(impression.contains("vast/impression"))
+        assertEquals(10_000L, presentationCueMs(10_000L, DASH_MANIFEST))
+        assertEquals(15_000L, presentationCueMs(10_000L, STITCHED_DASH))
     }
 }
 

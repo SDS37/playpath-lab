@@ -4,6 +4,8 @@ const val TITLE_ID = "playpath-bars"
 const val CLEAR_KEY_SYSTEM = "org.w3.clearkey"
 const val CLEAR_KEY_LICENSE_URL = "http://127.0.0.1:8082/"
 const val DASH_MANIFEST = "http://127.0.0.1:8080/manifest.mpd"
+const val STITCHED_DASH = "http://127.0.0.1:8083/ssai/dash/manifest.mpd"
+const val STITCHED_LEAD_MS = 5_000L
 const val WRONG_KEY_MANIFEST = "http://127.0.0.1:8080/manifest-wrong-kid.mpd"
 const val EVENT_LOG = "playpath.event"
 
@@ -65,13 +67,23 @@ fun adEvent(
     at: String,
     positionMs: Long,
     action: String,
+    breakId: String = "midroll",
+    mode: String = "csai",
 ): String {
     return envelope(sessionId, "ad", at, positionMs)
-        .append(",\"breakId\":\"midroll\"")
-        .append(",\"mode\":\"csai\"")
+        .append(",\"breakId\":${jsonString(breakId)}")
+        .append(",\"mode\":${jsonString(mode)}")
         .append(",\"action\":${jsonString(action)}")
         .append('}')
         .toString()
+}
+
+/** The VAST cue is 10 seconds into the film. A stitched timeline starts with the pre-roll. */
+fun presentationCueMs(cueMs: Long, manifestUrl: String): Long {
+    if (manifestUrl == STITCHED_DASH) {
+        return cueMs + STITCHED_LEAD_MS
+    }
+    return cueMs
 }
 
 /** Drops userinfo and the query so a manifest URL cannot carry a credential. */

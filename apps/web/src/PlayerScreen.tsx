@@ -2,12 +2,14 @@ import { useState } from "react";
 import { clearHlsMenu } from "./clearHlsMenu";
 import { Controls } from "./Controls";
 import { protectedMenus } from "./protectedMenus";
+import { stitchedDash } from "./stitchedMenu";
 import { usePlaybackSession } from "./usePlaybackSession";
 
 const menus = {
   dash: protectedMenus.dash,
   hls: protectedMenus.hls,
   clearHls: clearHlsMenu,
+  stitched: stitchedDash,
 } as const;
 
 type MenuName = keyof typeof menus;
@@ -16,6 +18,7 @@ const menuLabels: Record<MenuName, string> = {
   dash: "DASH",
   hls: "HLS",
   clearHls: "Clear HLS",
+  stitched: "Stitched",
 };
 
 export function PlayerScreen() {

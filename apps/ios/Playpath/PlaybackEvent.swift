@@ -37,9 +37,16 @@ func startupEvent(
     return line
 }
 
-func adEvent(sessionId: String, at: String, positionMs: Int, action: String) -> String {
+func adEvent(
+    sessionId: String,
+    at: String,
+    positionMs: Int,
+    action: String,
+    breakId: String = "midroll",
+    mode: String = "csai"
+) -> String {
     var line = envelope(sessionId: sessionId, event: "ad", at: at, positionMs: positionMs)
-    line += ",\"breakId\":\"midroll\",\"mode\":\"csai\",\"action\":\(jsonString(action))"
+    line += ",\"breakId\":\(jsonString(breakId)),\"mode\":\(jsonString(mode)),\"action\":\(jsonString(action))"
     line += "}"
     return line
 }

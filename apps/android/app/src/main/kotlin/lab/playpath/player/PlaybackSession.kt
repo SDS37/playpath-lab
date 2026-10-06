@@ -74,6 +74,7 @@ class PlaybackSession(
     private var creativeAssigned = false
     private var creativeStarted = false
     private var startupLogged = false
+    private var stitchedImpressionLogged = false
     private var loadStartedAt = 0L
     private var captions = true
     private val sessionJob = SupervisorJob()
@@ -138,6 +139,7 @@ class PlaybackSession(
         creativeAssigned = false
         creativeStarted = false
         startupLogged = false
+        stitchedImpressionLogged = false
         loadStartedAt = SystemClock.elapsedRealtime()
         this.manifestUrl = manifestUrl
         snapshot = PlaybackUiState(captions = captions)
@@ -392,6 +394,20 @@ class PlaybackSession(
                 manifestUrl = manifest,
             ),
         )
+        if (manifest == STITCHED_DASH && !stitchedImpressionLogged) {
+            stitchedImpressionLogged = true
+            Log.i(
+                EVENT_LOG,
+                adEvent(
+                    sessionId = sessionId,
+                    at = utcNow(),
+                    positionMs = positionMs,
+                    action = "impression",
+                    breakId = "preroll",
+                    mode = "ssai",
+                ),
+            )
+        }
     }
 
     private fun logAd(action: String) {
@@ -470,7 +486,7 @@ class PlaybackSession(
             if (released || attempt != adAttempt || midroll == null) {
                 return@launch
             }
-            cueMs = midroll.cueMs
+            cueMs = presentationCueMs(midroll.cueMs, manifestUrl ?: "")
             creativeUrl = midroll.mediaUrl
         }
     }
@@ -516,6 +532,7 @@ class PlaybackSession(
         creativeAssigned = true
         player.prepare()
         player.play()
+        logAd("impression")
         logAd("start")
         scope.launch {
             delay(CREATIVE_TIMEOUT_MS)

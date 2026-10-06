@@ -74,6 +74,35 @@ describe("bitrate event", () => {
       action: "start",
       positionMs: 10000,
     });
+    const impression = adEvent({
+      engine: "shaka",
+      sessionId: "session",
+      at: "2026-10-06T09:00:00Z",
+      positionMs: 0,
+      action: "impression",
+      breakId: "preroll",
+      mode: "ssai",
+    });
+    expect(JSON.parse(impression)).toMatchObject({
+      event: "ad",
+      breakId: "preroll",
+      mode: "ssai",
+      action: "impression",
+    });
+    expect(impression).not.toContain("vast/impression");
+    const midrollImpression = adEvent({
+      engine: "shaka",
+      sessionId: "session",
+      at: "2026-10-06T09:00:10Z",
+      positionMs: 10000,
+      action: "impression",
+    });
+    expect(JSON.parse(midrollImpression)).toMatchObject({
+      breakId: "midroll",
+      mode: "csai",
+      action: "impression",
+    });
+    expect(midrollImpression).not.toContain("vast/impression");
     expect(manifestUrlForEvent("http://127.0.0.1:8084/master.m3u8")).toBe(
       "http://127.0.0.1:8084/master.m3u8",
     );
