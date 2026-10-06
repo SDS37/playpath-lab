@@ -53,7 +53,9 @@ FairPlay, when a certificate exists, is an `AVContentKeySession` attached to the
 
 ## React Native
 
-The TypeScript screen follows React Native’s [Fabric native components](https://reactnative.dev/docs/fabric-native-components-introduction) guide ([Android](https://reactnative.dev/docs/fabric-native-components-android), [iOS](https://reactnative.dev/docs/fabric-native-components-ios)). The native view creates the Media3 or `AVPlayer` instance. JavaScript receives the same intent and event names as the other apps. It does not bundle a second decoder.
+`apps/mobile` uses React Native 0.87.1 and follows the [Fabric native components](https://reactnative.dev/docs/0.87/fabric-native-components-introduction) guide ([Android](https://reactnative.dev/docs/0.87/fabric-native-components-android), [iOS](https://reactnative.dev/docs/0.87/fabric-native-components-ios)). The spec is `PlaypathPlayerViewNativeComponent.ts`. Commands are `play`, `pause`, and `seek`. Events across the bridge are the [playback event](playback-events.md) JSON, with `platform` `react-native` and engine `media3` or `avplayer`.
+
+On Android the view builds Media3 1.11.1, opens Clear Key at `http://127.0.0.1:8082/`, and loads `http://127.0.0.1:8080/manifest.mpd`. The content key is not a prop. `./gradlew :app:compileDebugKotlin` and `PlaybackEventsTest` pass. On iOS the view creates `AVPlayer` and loads `http://127.0.0.1:8084/master.m3u8`. That play does not log `drm`. `pod` is not installed, and `bundle install` on Ruby 2.6.10 fails while compiling the `json` gem, so the iOS app has not been built. JavaScript does not decode samples. A playing session is still the observation. The mid-roll is not wired on this view, and the impression URL is not requested.
 
 ## Receiver page
 
