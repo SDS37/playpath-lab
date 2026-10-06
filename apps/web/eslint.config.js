@@ -29,6 +29,7 @@ export default defineConfig(
       "src/clearHlsMenu.ts",
       "src/chooseEngine.ts",
       "src/midroll.ts",
+      "src/receiverMain.ts",
     ],
     rules: {
       "no-restricted-imports": [

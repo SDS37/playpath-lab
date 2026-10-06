@@ -59,7 +59,7 @@ On Android the view builds Media3 1.11.1, opens Clear Key at `http://127.0.0.1:8
 
 ## Receiver page
 
-A Cast or smart-TV web runtime is JavaScript. The PoC page is a document that can be opened in a desktop browser and that loads the manifest with Shaka. Certification, CAF receiver registration, and Tizen or webOS packages are [beyond the PoC](beyond-poc.md).
+A Cast or smart-TV web runtime is JavaScript. The PoC page is `http://127.0.0.1:5173/receiver.html`. It creates a media element and loads `http://127.0.0.1:8080/manifest.mpd` with Shaka, using the same Clear Key license URL as the web session. Opening that page in a desktop browser shows the color bars. Shaka requests the manifest and posts to the license service. The content key is not in the page. Certification, CAF receiver registration, and Tizen or webOS packages are [beyond the PoC](beyond-poc.md).
 
 ## Choosing an engine
 

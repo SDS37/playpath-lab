@@ -44,3 +44,7 @@ flowchart TD
 Shaka 5.2.12 does not parse the lab HLS key format. The session rewrites that playlist line to a key format Shaka does parse, maps it to `org.w3.clearkey`, and supplies a Clear Key init-data box built from the key id already in the playlist. The license request stays on the lab server.
 
 On this page, a stopped license and a black picture are later observations. Android already shows that failure.
+
+## Receiver page
+
+`http://127.0.0.1:5173/receiver.html` is a second document on the same origin. It creates a media element and loads `http://127.0.0.1:8080/manifest.mpd` with Shaka. Clear Key uses the URL from `drmServers.ts`. Opening the page shows the color bars after that load and a post to the license service. The page does not contain the content key, does not import hls.js, and does not register a Cast, Tizen, or webOS receiver. Those certifications stay out of scope.
