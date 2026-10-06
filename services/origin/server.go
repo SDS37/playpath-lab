@@ -10,6 +10,8 @@ import (
 	"strings"
 )
 
+const webOrigin = "http://127.0.0.1:5173"
+
 // Server serves one package tree over HTTP. It does not list directories
 // and it does not serve the lab key.
 type Server struct {
@@ -42,9 +44,19 @@ func (s *Server) SetRefuseSegments(on bool) {
 }
 
 // ServeHTTP answers GET and HEAD for a file in the package tree.
+// A page on http://127.0.0.1:5173 can read those responses. Other origins cannot.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.allowWeb(w, r)
+	if r.Method == http.MethodOptions {
+		if !s.exists(r.URL.Path) {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		w.Header().Set("Allow", "GET, HEAD")
+		w.Header().Set("Allow", "GET, HEAD, OPTIONS")
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -74,6 +86,26 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}()
 	w.Header().Set("Content-Type", s.contentType(full))
 	http.ServeContent(w, r, info.Name(), info.ModTime(), f)
+}
+
+func (s *Server) allowWeb(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Origin") != webOrigin {
+		return
+	}
+	w.Header().Set("Access-Control-Allow-Origin", webOrigin)
+	w.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Range")
+	w.Header().Set("Access-Control-Expose-Headers", "Accept-Ranges, Content-Length, Content-Range, Content-Type")
+	w.Header().Set("Vary", "Origin")
+}
+
+func (s *Server) exists(urlPath string) bool {
+	full, ok := s.file(urlPath)
+	if !ok {
+		return false
+	}
+	info, err := os.Stat(full)
+	return err == nil && !info.IsDir()
 }
 
 func (s *Server) file(urlPath string) (string, bool) {
