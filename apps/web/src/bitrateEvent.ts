@@ -37,11 +37,15 @@ export function startupEvent(
 }
 
 export function adEvent(
-  input: EventFields & { action: "start" | "complete" | "error" },
+  input: EventFields & {
+    action: "start" | "impression" | "complete" | "error";
+    breakId?: "preroll" | "midroll";
+    mode?: "ssai" | "csai";
+  },
 ): string {
   return eventLine(input, "ad", [
-    '"breakId":"midroll"',
-    '"mode":"csai"',
+    `"breakId":${jsonString(input.breakId ?? "midroll")}`,
+    `"mode":${jsonString(input.mode ?? "csai")}`,
     `"action":${jsonString(input.action)}`,
   ]);
 }
