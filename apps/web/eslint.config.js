@@ -28,6 +28,7 @@ export default defineConfig(
       "src/protectedMenus.ts",
       "src/clearHlsMenu.ts",
       "src/chooseEngine.ts",
+      "src/midroll.ts",
     ],
     rules: {
       "no-restricted-imports": [

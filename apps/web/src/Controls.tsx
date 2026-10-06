@@ -20,6 +20,7 @@ export function Controls({ snapshot, onPlay, onPause, onSeek }: ControlsProps) {
     <div
       className="control-bar"
       data-stalled={snapshot.stalled ? "true" : "false"}
+      data-ad={snapshot.adPlaying ? "true" : "false"}
       style={{ "--progress": progress }}
     >
       <button
@@ -37,11 +38,16 @@ export function Controls({ snapshot, onPlay, onPause, onSeek }: ControlsProps) {
         value={Math.min(snapshot.positionMs, snapshot.durationMs)}
         aria-label="Seek"
         aria-valuetext={formatTime(snapshot.positionMs)}
+        disabled={snapshot.adPlaying}
         onChange={(event) => {
+          if (snapshot.adPlaying) {
+            return;
+          }
           onSeek(Number(event.target.value));
         }}
       />
       <span className="time">
+        {snapshot.adPlaying ? "Ad " : ""}
         {formatTime(snapshot.positionMs)} / {formatTime(snapshot.durationMs)}
       </span>
       {snapshot.stalled ? <span className="stall">Buffering</span> : null}

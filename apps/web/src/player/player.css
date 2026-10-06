@@ -66,6 +66,10 @@ body {
   accent-color: var(--accent);
 }
 
+.seek:disabled {
+  opacity: 0.45;
+}
+
 .time,
 .stall {
   color: var(--text);
