@@ -32,9 +32,9 @@ flowchart TD
 
 `PlayerScreen` is the screen. It keeps the selected menu, DASH or HLS, and the media element. The menu choice is the URL from `protectedMenus.ts`. It calls `usePlaybackSession` with that element and URL, then renders `Controls` with the snapshot and the three intents. The DASH and HLS buttons live here. They are not a separate component.
 
-`Controls` is the bar. It draws play or pause from `playbackState`, the seek range, the time label, the buffering label, and the error text. `--progress` is the only inline style. A click calls `onPlay`, `onPause`, or `onSeek`. It does not import Shaka, read a playlist, or call methods on the media element.
+`Controls` is the bar. It draws Pause when `playbackState` is `playing` or `seeking`, and Play when it is `paused` or `ended`. It also draws the seek range, the time label, the buffering label, and the error text. `--progress` is the only inline style. A click calls `onPlay`, `onPause`, or `onSeek`. It does not import Shaka, read a playlist, or call methods on the media element.
 
-`usePlaybackSession` is the hook that connects React to the session. It creates one `PlaybackSession` in an effect, keeps that object in a ref, and stores the snapshot in state. Cleanup destroys the session before the next load, including the extra mount from `StrictMode`. `play`, `pause`, and `seek` forward to the session. The hook does not render.
+`usePlaybackSession` is the hook that connects React to the session. It creates one `PlaybackSession` in an effect, keeps that object in a ref, and stores the snapshot in state. Cleanup destroys that session immediately, including the extra mount from `StrictMode`. The next load waits for that destroy, not for a load that has not finished. `play`, `pause`, and `seek` forward to the session. The hook does not render.
 
 `PlaybackSession` owns the engine. It constructs `shaka.Player`, attaches it to the media element, points Clear Key at the URL from `drmServers.ts`, and loads the manifest. For an HLS playlist it runs `hlsClearKey.ts` on the response so Shaka can request a license from the lab server. Engine events become one snapshot: `playbackState`, `stalled`, `positionMs`, `durationMs`, and `error`. The class has no JSX. It does not read the content key.
 

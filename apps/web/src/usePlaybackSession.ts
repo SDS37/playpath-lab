@@ -30,7 +30,7 @@ export function usePlaybackSession(
         setSnapshot(next);
       }
     });
-    chainRef.current = chainRef.current
+    const loading = chainRef.current
       .catch(() => {
         // The next load still has to run after a rejected destroy.
         return undefined;
@@ -41,18 +41,24 @@ export function usePlaybackSession(
         }
         await session.load(manifestUrl);
       });
+    chainRef.current = loading;
     return () => {
       active = false;
       unsubscribe();
       if (sessionRef.current === session) {
         sessionRef.current = null;
       }
-      chainRef.current = chainRef.current
-        .catch(() => {
-          // The next load still has to run after a rejected destroy.
-          return undefined;
-        })
-        .then(() => session.destroy());
+      // Destroy starts now. A load blocked on the origin or the license
+      // service must not hold the next menu behind it.
+      const destroyed = session.destroy().catch(() => {
+        // The next load still has to run after a rejected destroy.
+        return undefined;
+      });
+      chainRef.current = destroyed;
+      void loading.catch(() => {
+        // Destroy can reject the load it cancelled.
+        return undefined;
+      });
     };
   }, [video, manifestUrl]);
 
