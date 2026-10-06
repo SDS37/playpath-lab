@@ -10,24 +10,26 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-
-private val ScreenPadding = 12.dp
 
 @Composable
 fun PlayerScreen() {
@@ -60,12 +62,13 @@ fun PlayerScreen() {
             manifestUrl = url
         }
     }
+    val spacing = LocalPlaypathSpacing.current
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .safeDrawingPadding()
-            .padding(ScreenPadding),
+            .padding(spacing.screen),
     ) {
         MenuButton(
             label = "DASH",
@@ -86,6 +89,7 @@ fun PlayerScreen() {
             state = state,
             onPlay = session::play,
             onPause = session::pause,
+            onSeek = session::seek,
         )
         val error = state.error
         if (error != null) {
@@ -107,6 +111,13 @@ private fun MenuButton(
     }
 }
 
+data class PlaypathSpacing(
+    val screen: Dp = 12.dp,
+    val bar: Dp = 8.dp,
+)
+
+val LocalPlaypathSpacing = staticCompositionLocalOf { PlaypathSpacing() }
+
 @Composable
 fun PlaypathTheme(content: @Composable () -> Unit) {
     val scheme = darkColorScheme(
@@ -115,10 +126,18 @@ fun PlaypathTheme(content: @Composable () -> Unit) {
         onBackground = TEXT,
         onSurface = TEXT,
         primary = ACCENT,
+        onPrimary = BACKGROUND,
         error = DANGER,
         onError = BACKGROUND,
     )
-    MaterialTheme(colorScheme = scheme, content = content)
+    MaterialTheme(
+        colorScheme = scheme,
+        typography = Typography(),
+    ) {
+        CompositionLocalProvider(LocalPlaypathSpacing provides PlaypathSpacing()) {
+            content()
+        }
+    }
 }
 
 private val BACKGROUND = Color(0xFF111111)

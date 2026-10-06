@@ -10,6 +10,7 @@ enum class PlaybackState {
 data class PlaybackUiState(
     val playbackState: PlaybackState = PlaybackState.Paused,
     val stalled: Boolean = false,
+    val adPlaying: Boolean = false,
     val positionMs: Long = 0,
     val durationMs: Long = 0,
     val height: Int = 0,
