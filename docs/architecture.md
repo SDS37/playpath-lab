@@ -177,7 +177,7 @@ hls.js is the wrong place to hang DRM. A title that needs DASH plus a key system
 
 ### Phase 8 — Buffer, ABR, decode
 
-The engine downloads the first segments, picks a bitrate, and steps down if the network slows. That switch is ABR. Decoders are platform code. The UI language receives events: playing, stalled, quality changed.
+The engine downloads the first segments, picks a bitrate, and steps down if the network slows. That switch is ABR. Decoders are platform code. The UI language receives events: playing, stalled, quality changed. On Chrome, clear HLS through hls.js, restricting throughput after 1080p is selected moves playback to 720p. The session logs `bitrate` with `height` 720 and `bandwidthBps` 2157897. The control does not assign that rung.
 
 Retries are ordered: fetch the segment again, then step down a rung, then fail to the backup origin.
 

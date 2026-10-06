@@ -1,5 +1,6 @@
 import Hls from "hls.js";
 import shaka from "shaka-player";
+import { bitrateEvent, type BitrateEngine } from "./bitrateEvent";
 import { chooseEngine } from "./chooseEngine";
 import { clearKeyLicenseUrl, drmServers } from "./drmServers";
 import { rewriteClearKeyPlaylist } from "./hlsClearKey";
@@ -11,6 +12,8 @@ export type PlaybackSnapshot = {
   stalled: boolean;
   positionMs: number;
   durationMs: number;
+  height: number | undefined;
+  bandwidthBps: number | undefined;
   error: string | undefined;
 };
 
@@ -31,6 +34,8 @@ export const initialSnapshot: PlaybackSnapshot = {
   stalled: false,
   positionMs: 0,
   durationMs: 0,
+  height: undefined,
+  bandwidthBps: undefined,
   error: undefined,
 };
 
@@ -41,6 +46,7 @@ export class PlaybackSession {
   #native = false;
   #nativeGeneration = 0;
   #generation = 0;
+  #sessionId = "";
   #bound = false;
   #listeners = new Set<(snapshot: PlaybackSnapshot) => void>();
   #snapshot: PlaybackSnapshot = initialSnapshot;
@@ -52,6 +58,15 @@ export class PlaybackSession {
       return;
     }
     this.#fail(this.#video.error);
+  };
+  #onNativeResize = (): void => {
+    if (!this.#native || this.#nativeGeneration !== this.#generation) {
+      return;
+    }
+    const height = this.#video.videoHeight;
+    if (height > 0 && height !== this.#snapshot.height) {
+      this.#set({ ...this.#snapshot, height, bandwidthBps: undefined });
+    }
   };
 
   constructor(video: HTMLVideoElement) {
@@ -69,6 +84,7 @@ export class PlaybackSession {
   async load(manifestUrl: string): Promise<void> {
     this.#generation += 1;
     const generation = this.#generation;
+    this.#sessionId = crypto.randomUUID();
     await this.#releasePlayer();
     if (generation !== this.#generation) {
       return;
@@ -166,11 +182,18 @@ export class PlaybackSession {
         }
         this.#set({ ...this.#snapshot, stalled: isBuffering(event) });
       });
+      player.addEventListener("adaptation", () => {
+        if (generation !== this.#generation) {
+          return;
+        }
+        this.#noteShaka(player);
+      });
       this.#bindVideo();
       await player.load(manifestUrl);
       if (generation !== this.#generation) {
         return;
       }
+      this.#noteShaka(player);
       this.#publishFromVideo();
     } catch (err) {
       if (generation !== this.#generation) {
@@ -209,6 +232,16 @@ export class PlaybackSession {
       }
       this.#fail(data);
     });
+    hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => {
+      if (generation !== this.#generation) {
+        return;
+      }
+      const level = hls.levels[data.level];
+      if (level === undefined) {
+        return;
+      }
+      this.#noteRendition("hlsjs", level.height, level.bitrate, level.codecs);
+    });
     hls.loadSource(manifestUrl);
     hls.attachMedia(this.#video);
     this.#bindVideo();
@@ -218,6 +251,7 @@ export class PlaybackSession {
     this.#native = true;
     this.#nativeGeneration = generation;
     this.#video.addEventListener("error", this.#onNativeError);
+    this.#video.addEventListener("resize", this.#onNativeResize);
     this.#video.src = manifestUrl;
     this.#bindVideo();
   }
@@ -235,6 +269,7 @@ export class PlaybackSession {
     }
     if (this.#native) {
       this.#video.removeEventListener("error", this.#onNativeError);
+      this.#video.removeEventListener("resize", this.#onNativeResize);
       this.#native = false;
       this.#video.removeAttribute("src");
       this.#video.load();
@@ -259,6 +294,56 @@ export class PlaybackSession {
     for (const name of videoEvents) {
       this.#video.removeEventListener(name, this.#onVideo);
     }
+  }
+
+  #noteShaka(player: shaka.Player): void {
+    const active = player.getVariantTracks().find((track) => track.active);
+    if (active === undefined) {
+      return;
+    }
+    this.#noteRendition(
+      "shaka",
+      active.height ?? undefined,
+      active.bandwidth,
+      active.codecs ?? undefined,
+    );
+  }
+
+  #noteRendition(
+    engine: BitrateEngine,
+    height: number | undefined,
+    bandwidthBps: number | undefined,
+    codecs: string | undefined,
+  ): void {
+    const nextHeight = height !== undefined && height > 0 ? height : undefined;
+    const nextBandwidth =
+      bandwidthBps !== undefined && bandwidthBps > 0 ? bandwidthBps : undefined;
+    if (nextHeight === undefined && nextBandwidth === undefined) {
+      return;
+    }
+    if (
+      nextHeight === this.#snapshot.height &&
+      nextBandwidth === this.#snapshot.bandwidthBps
+    ) {
+      return;
+    }
+    this.#set({
+      ...this.#snapshot,
+      height: nextHeight,
+      bandwidthBps: nextBandwidth,
+    });
+    const at = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+    console.info(
+      bitrateEvent({
+        engine,
+        sessionId: this.#sessionId,
+        at,
+        positionMs: Math.round(this.#video.currentTime * 1000),
+        height: nextHeight,
+        bandwidthBps: nextBandwidth,
+        codecs,
+      }),
+    );
   }
 
   #publishFromVideo(): void {

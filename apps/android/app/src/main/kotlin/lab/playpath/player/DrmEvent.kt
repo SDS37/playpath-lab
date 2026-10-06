@@ -34,6 +34,37 @@ fun drmEvent(
     }
 }
 
+fun bitrateEvent(
+    sessionId: String,
+    at: String,
+    positionMs: Long,
+    height: Int,
+    bandwidthBps: Int,
+    codecs: String,
+): String {
+    return buildString {
+        append('{')
+        append("\"version\":1")
+        append(",\"titleId\":${jsonString(TITLE_ID)}")
+        append(",\"sessionId\":${jsonString(sessionId)}")
+        append(",\"platform\":\"android\"")
+        append(",\"engine\":\"media3\"")
+        append(",\"event\":\"bitrate\"")
+        append(",\"at\":${jsonString(at)}")
+        append(",\"positionMs\":$positionMs")
+        if (height > 0) {
+            append(",\"height\":$height")
+        }
+        if (bandwidthBps > 0) {
+            append(",\"bandwidthBps\":$bandwidthBps")
+        }
+        if (codecs.isNotEmpty()) {
+            append(",\"codecs\":${jsonString(codecs)}")
+        }
+        append('}')
+    }
+}
+
 private fun jsonString(value: String): String {
     val escaped = buildString(value.length) {
         for (ch in value) {

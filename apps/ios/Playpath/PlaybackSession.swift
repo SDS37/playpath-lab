@@ -15,6 +15,8 @@ struct PlaybackSnapshot {
     var isStalled = false
     var positionMs = 0
     var durationMs = 0
+    var height = 0
+    var bandwidthBps = 0
     var error: String?
 }
 
@@ -34,13 +36,16 @@ final class PlaybackSession {
     private var didPlayToEnd = false
     private var seeking = false
     private var failureMessage: String?
-    private var indicatedBitrate: Double?
+    private var sessionId = ""
+    private var recordedHeight = 0
+    private var recordedBandwidth = 0
     private var timeObserver: Any?
     private var timeControlObservation: NSKeyValueObservation?
     private var itemStatusObservation: NSKeyValueObservation?
     private var endObserver: NSObjectProtocol?
     private var failedObserver: NSObjectProtocol?
     private var accessLogObserver: NSObjectProtocol?
+    private var presentationObservation: NSKeyValueObservation?
 
     init() {
         timeControlObservation = player.observe(\.timeControlStatus, options: [.new]) { [weak self] _, _ in
@@ -73,7 +78,9 @@ final class PlaybackSession {
         didPlayToEnd = false
         seeking = false
         failureMessage = nil
-        indicatedBitrate = nil
+        sessionId = UUID().uuidString
+        recordedHeight = 0
+        recordedBandwidth = 0
         let item = AVPlayerItem(url: url)
         observe(item)
         player.replaceCurrentItem(with: item)
@@ -153,6 +160,11 @@ final class PlaybackSession {
             }
             self?.rememberVariant(of: item)
         }
+        presentationObservation = item.observe(\.presentationSize, options: [.new]) { [weak self] item, _ in
+            DispatchQueue.main.async {
+                self?.rememberVariant(of: item)
+            }
+        }
     }
 
     private func removeItemObservers() {
@@ -168,6 +180,8 @@ final class PlaybackSession {
         endObserver = nil
         failedObserver = nil
         accessLogObserver = nil
+        presentationObservation?.invalidate()
+        presentationObservation = nil
     }
 
     private func noteStatus(of item: AVPlayerItem) {
@@ -180,10 +194,41 @@ final class PlaybackSession {
     /// Records the rung `AVPlayer` chose. Controls do not read it and do not pick one.
     private func rememberVariant(of item: AVPlayerItem) {
         let bitrate = item.accessLog()?.events.last?.indicatedBitrate
-        guard let bitrate, bitrate.isFinite, bitrate > 0, bitrate != indicatedBitrate else {
+        let bandwidth = bitrate.map { value -> Int in
+            guard value.isFinite, value > 0 else {
+                return 0
+            }
+            return Int(value.rounded())
+        } ?? 0
+        let presentationHeight = Int(item.presentationSize.height.rounded())
+        let height = presentationHeight > 0 ? presentationHeight : recordedHeight
+        let nextBandwidth = bandwidth > 0 ? bandwidth : recordedBandwidth
+        guard height > 0 || nextBandwidth > 0 else {
             return
         }
-        indicatedBitrate = bitrate
+        guard height != recordedHeight || nextBandwidth != recordedBandwidth else {
+            return
+        }
+        recordedHeight = height
+        recordedBandwidth = nextBandwidth
+        logBitrate(height: height, bandwidthBps: nextBandwidth)
+        publish()
+    }
+
+    private func logBitrate(height: Int, bandwidthBps: Int) {
+        let clock = ISO8601DateFormatter()
+        var line = "{\"version\":1,\"titleId\":\"playpath-bars\""
+        line += ",\"sessionId\":\"\(sessionId)\",\"platform\":\"ios\",\"engine\":\"avplayer\""
+        line += ",\"event\":\"bitrate\",\"at\":\"\(clock.string(from: Date()))\""
+        line += ",\"positionMs\":\(snapshot.positionMs)"
+        if height > 0 {
+            line += ",\"height\":\(height)"
+        }
+        if bandwidthBps > 0 {
+            line += ",\"bandwidthBps\":\(bandwidthBps)"
+        }
+        line += "}"
+        print(line)
     }
 
     private func publish() {
@@ -199,6 +244,8 @@ final class PlaybackSession {
             isStalled: player.timeControlStatus == .waitingToPlayAtSpecifiedRate && !seeking,
             positionMs: milliseconds(player.currentTime()),
             durationMs: milliseconds(item?.duration ?? .indefinite),
+            height: recordedHeight,
+            bandwidthBps: recordedBandwidth,
             error: failureMessage
         )
         snapshot = next
