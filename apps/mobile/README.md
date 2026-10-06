@@ -19,7 +19,7 @@ Android, from `android/`:
 ./gradlew :app:compileDebugKotlin :app:testDebugUnitTest --tests lab.playpath.mobile.PlaybackEventsTest
 ```
 
-That compile and those tests passed. A playing session on a device is still the observation.
+That compile and those tests passed. On the emulator the TypeScript controls show Pause and 0:04 / 1:00, and the Media3 view shows the color bars. That session logs `startup` for `http://127.0.0.1:8080/manifest.mpd`, `drm` with `result` `ok`, and `bitrate` with `height` 1080 and `bandwidthBps` 4545011. `platform` is `react-native` and `engine` is `media3`. The iOS picture is still the observation.
 
 ## iOS toolchain
 
