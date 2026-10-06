@@ -272,7 +272,7 @@ final class PlaybackSession {
         if item.status == .failed {
             if adPhase == .creative {
                 if creativeFailure() {
-                    resumeFilm()
+                    resumeFilm(completed: false)
                 }
                 return
             }
@@ -290,7 +290,7 @@ final class PlaybackSession {
         }
         if adPhase == .creative, creativeAssigned {
             creativeStarted = true
-            resumeFilm()
+            resumeFilm(completed: true)
             return
         }
         didPlayToEnd = true
@@ -304,7 +304,7 @@ final class PlaybackSession {
         }
         if adPhase == .creative {
             if creativeFailure() {
-                resumeFilm()
+                resumeFilm(completed: false)
             }
             return
         }
@@ -422,11 +422,11 @@ final class PlaybackSession {
         publish()
     }
 
-    private func resumeFilm() {
+    private func resumeFilm(completed: Bool) {
         guard adPhase == .creative else {
             return
         }
-        logAd(creativeStarted ? "complete" : "error")
+        logAd(completed ? "complete" : "error")
         guard let loadedURL, let cueMs else {
             adPhase = .off
             failureMessage = "Playback failed."
@@ -484,7 +484,7 @@ final class PlaybackSession {
                     return
                 }
                 if phase == .creative, !self.creativeStarted {
-                    self.resumeFilm()
+                    self.resumeFilm(completed: false)
                     return
                 }
                 if phase == .resume {

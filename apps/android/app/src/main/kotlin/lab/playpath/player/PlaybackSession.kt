@@ -262,7 +262,7 @@ class PlaybackSession(
             adPhase == AdPhase.Creative &&
             creativeStarted
         ) {
-            scope.launch { resumeFilm() }
+            scope.launch { resumeFilm(completed = true) }
             return
         }
         publish()
@@ -297,7 +297,7 @@ class PlaybackSession(
     override fun onPlayerError(error: PlaybackException) {
         if (adPhase == AdPhase.Creative) {
             if (creativeFailure()) {
-                scope.launch { resumeFilm() }
+                scope.launch { resumeFilm(completed = false) }
             }
             return
         }
@@ -503,16 +503,16 @@ class PlaybackSession(
                 adPhase == AdPhase.Creative &&
                 !creativeStarted
             ) {
-                resumeFilm()
+                resumeFilm(completed = false)
             }
         }
     }
 
-    private fun resumeFilm() {
+    private fun resumeFilm(completed: Boolean) {
         if (released || adPhase != AdPhase.Creative) {
             return
         }
-        logAd(if (creativeStarted) "complete" else "error")
+        logAd(if (completed) "complete" else "error")
         val manifest = manifestUrl
         val cue = cueMs
         if (manifest == null || cue == null) {

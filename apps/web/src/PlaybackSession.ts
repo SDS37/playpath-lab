@@ -75,6 +75,7 @@ export class PlaybackSession {
   #creativeStarted = false;
   #playWhenReady = false;
   #loadStartedMs = 0;
+  #firstFrameMs: number | undefined = undefined;
   #startupLogged = false;
   #drmLogged = false;
   #bound = false;
@@ -105,7 +106,7 @@ export class PlaybackSession {
     if (src !== "" && src !== this.#creativeUrl) {
       return;
     }
-    void this.#resumeFilm();
+    void this.#resumeFilm(false);
   };
   #onCreativeEnded = (): void => {
     if (this.#adPhase !== "creative" || !this.#creativeStarted) {
@@ -114,7 +115,16 @@ export class PlaybackSession {
     if (this.#video.currentSrc !== this.#creativeUrl || !this.#video.ended) {
       return;
     }
-    void this.#resumeFilm();
+    void this.#resumeFilm(true);
+  };
+  #onFirstFrame = (): void => {
+    if (this.#firstFrameMs !== undefined || this.#adPhase !== "off") {
+      return;
+    }
+    if (this.#video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+      return;
+    }
+    this.#firstFrameMs = performance.now();
   };
   #onNativeError = (): void => {
     if (
@@ -156,6 +166,7 @@ export class PlaybackSession {
     const generation = this.#generation;
     this.#sessionId = crypto.randomUUID();
     this.#loadStartedMs = performance.now();
+    this.#firstFrameMs = undefined;
     this.#startupLogged = false;
     this.#drmLogged = false;
     this.#shakaBuffering = false;
@@ -390,10 +401,13 @@ export class PlaybackSession {
       return;
     }
     this.#bound = true;
+    // `playing` is registered first so startup is logged before a cue starts the ad.
+    this.#video.addEventListener("playing", this.#onPlaying);
+    this.#video.addEventListener("loadeddata", this.#onFirstFrame);
     for (const name of videoEvents) {
       this.#video.addEventListener(name, this.#onVideo);
     }
-    this.#video.addEventListener("playing", this.#onPlaying);
+    this.#onFirstFrame();
   }
 
   #unbindVideo(): void {
@@ -401,10 +415,11 @@ export class PlaybackSession {
       return;
     }
     this.#bound = false;
+    this.#video.removeEventListener("playing", this.#onPlaying);
+    this.#video.removeEventListener("loadeddata", this.#onFirstFrame);
     for (const name of videoEvents) {
       this.#video.removeEventListener(name, this.#onVideo);
     }
-    this.#video.removeEventListener("playing", this.#onPlaying);
   }
 
   #noteShaka(player: shaka.Player): void {
@@ -469,13 +484,14 @@ export class PlaybackSession {
     }
     this.#startupLogged = true;
     const positionMs = Math.round(this.#video.currentTime * 1000);
+    const frameAt = this.#firstFrameMs ?? performance.now();
     console.info(
       startupEvent({
         engine,
         sessionId: this.#sessionId,
         at: utcNow(),
         positionMs,
-        startupMs: performance.now() - this.#loadStartedMs,
+        startupMs: frameAt - this.#loadStartedMs,
         manifestUrl: this.#manifestUrl,
       }),
     );
@@ -584,18 +600,21 @@ export class PlaybackSession {
         return;
       }
       if (!ready) {
-        await this.#resumeFilm();
+        await this.#resumeFilm(false);
         return;
       }
       this.#creativeStarted = true;
       this.#publishFromVideo();
-      this.#logAd("start");
       await this.#video.play();
+      if (!this.#ownsCreative(generation, attempt)) {
+        return;
+      }
+      this.#logAd("start");
     } catch {
       if (!this.#ownsCreative(generation, attempt)) {
         return;
       }
-      await this.#resumeFilm();
+      await this.#resumeFilm(false);
     }
   }
 
@@ -607,11 +626,11 @@ export class PlaybackSession {
     );
   }
 
-  async #resumeFilm(): Promise<void> {
+  async #resumeFilm(completed: boolean): Promise<void> {
     if (this.#adPhase !== "creative") {
       return;
     }
-    this.#logAd(this.#creativeStarted ? "complete" : "error");
+    this.#logAd(completed ? "complete" : "error");
     this.#adAttempt += 1;
     this.#adPhase = "resume";
     this.#creativeAssigned = false;
