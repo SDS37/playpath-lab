@@ -9,6 +9,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -43,6 +44,8 @@ class PlaybackSession(
     private var drmCode: String? = null
     private var manifestUrl: String? = null
     private var released = false
+    private var recordedHeight = 0
+    private var recordedBandwidth = 0
 
     init {
         val httpFactory = DefaultHttpDataSource.Factory().setUserAgent("playpath-android")
@@ -81,6 +84,8 @@ class PlaybackSession(
         seeking = false
         drmReported = false
         drmCode = null
+        recordedHeight = 0
+        recordedBandwidth = 0
         this.manifestUrl = manifestUrl
         snapshot = PlaybackUiState()
         publish()
@@ -139,6 +144,45 @@ class PlaybackSession(
         player.removeListener(this)
         player.removeAnalyticsListener(this)
         player.release()
+    }
+
+    override fun onTracksChanged(tracks: Tracks) {
+        if (released) {
+            return
+        }
+        var height = 0
+        var bandwidth = 0
+        var codecs = ""
+        for (group in tracks.groups) {
+            if (group.type != C.TRACK_TYPE_VIDEO) {
+                continue
+            }
+            for (index in 0 until group.length) {
+                if (!group.isTrackSelected(index)) {
+                    continue
+                }
+                val format = group.getTrackFormat(index)
+                if (format.height > 0) {
+                    height = format.height
+                }
+                if (format.bitrate > 0) {
+                    bandwidth = format.bitrate
+                }
+                val formatCodecs = format.codecs
+                if (!formatCodecs.isNullOrEmpty()) {
+                    codecs = formatCodecs
+                }
+            }
+        }
+        if ((height == 0 && bandwidth == 0) ||
+            (height == recordedHeight && bandwidth == recordedBandwidth)
+        ) {
+            return
+        }
+        recordedHeight = height
+        recordedBandwidth = bandwidth
+        logBitrate(height, bandwidth, codecs)
+        publish()
     }
 
     override fun onPlaybackStateChanged(playbackState: Int) {
@@ -217,6 +261,21 @@ class PlaybackSession(
         publish(error = DRM_ERROR)
     }
 
+    private fun logBitrate(height: Int, bandwidth: Int, codecs: String) {
+        val positionMs = if (released) 0 else player.currentPosition.coerceAtLeast(0)
+        Log.i(
+            EVENT_LOG,
+            bitrateEvent(
+                sessionId = sessionId,
+                at = utcNow(),
+                positionMs = positionMs,
+                height = height,
+                bandwidthBps = bandwidth,
+                codecs = codecs,
+            ),
+        )
+    }
+
     private fun logDrm(result: String, code: String) {
         val positionMs = if (released) 0 else player.currentPosition.coerceAtLeast(0)
         Log.i(
@@ -243,6 +302,8 @@ class PlaybackSession(
                 !seeking,
             positionMs = player.currentPosition.coerceAtLeast(0),
             durationMs = if (duration > 0) duration else 0,
+            height = recordedHeight,
+            bandwidthBps = recordedBandwidth,
             error = error,
         )
         snapshot = next

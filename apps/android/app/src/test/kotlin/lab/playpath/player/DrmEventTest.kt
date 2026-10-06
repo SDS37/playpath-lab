@@ -39,6 +39,23 @@ class DrmEventTest {
         assertEquals("40", field(event, "positionMs"))
         assertFalse(event.contains("ffefcdab"))
     }
+
+    @Test
+    fun `a lower rung is a bitrate event`() {
+        val event = bitrateEvent(
+            sessionId = "session",
+            at = "2026-10-06T09:00:00Z",
+            positionMs = 4000,
+            height = 720,
+            bandwidthBps = 2_164_878,
+            codecs = "avc1.64001f,mp4a.40.2",
+        )
+        assertEquals("bitrate", field(event, "event"))
+        assertEquals("media3", field(event, "engine"))
+        assertEquals("720", field(event, "height"))
+        assertEquals("2164878", field(event, "bandwidthBps"))
+        assertFalse(event.contains("ffefcdab"))
+    }
 }
 
 private fun field(json: String, name: String): String {

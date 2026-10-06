@@ -129,7 +129,7 @@ A license failure:
 | Shaka DRM error via the player error event | `drm` |
 | hls.js `LEVEL_SWITCHED`, `ERROR` | `bitrate`, `error` |
 | Media3 `onPlaybackStateChanged`, `onTracksChanged`, DRM session error | `state`, `bitrate`, `drm` |
-| `AVPlayer` `timeControlStatus`, access log, item error | `state`, `stalled`, `bitrate`, `error` |
+| `AVPlayer` `timeControlStatus`, access log, `presentationSize`, item error | `state`, `stalled`, `bitrate`, `error` |
 
 The mapper lives in the playback session. Controls do not translate engine codes.
 
