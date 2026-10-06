@@ -2,7 +2,7 @@
 
 PlayPath is a lab for one streaming path. The title is prepared before any app runs. Each device then plays it with the engine that platform already has.
 
-This document describes the path the PoC runs. The pipeline, both origins, the ads service, and the Clear Key license service are built. The apps are not, so nothing here claims a player is running. Week-by-week order is the [roadmap](roadmap.md). Choices are the [ADRs](architecture-decision-records.md). The proof for each box is a row in the [technical requirements](technical-requirements.md).
+This document describes the path the PoC runs. The pipeline, both origins, the ads service, the Clear Key license service, and the web app are built. Android, iOS, and React Native are not, so nothing here claims those players are running. Week-by-week order is the [roadmap](roadmap.md). Choices are the [ADRs](architecture-decision-records.md). The proof for each box is a row in the [technical requirements](technical-requirements.md).
 
 **How to read the diagrams.** Solid arrows are the happy path. The license step fails closed: no key, no picture. The ad stitcher fails open: no personalised menu, play the clean film.
 
@@ -132,7 +132,7 @@ Clear Key proves the encrypt-then-license shape on web and Android. It does not 
 
 Encrypted segments and both menus are files on an HTTP origin. The player requests a few seconds at a time. A failed chunk can be fetched again. A second origin is the resilience add-on. See [ADR-010](architecture-decision-records.md).
 
-`go run ./services/origin` serves `pipeline/protected/playpath-bars/` on `http://127.0.0.1:8080`. The same command with `-addr 127.0.0.1:8081` serves that tree on origin B. A GET of a menu or segment returns a content type and `Last-Modified`. The process does not list directories, and it does not serve the content key or the mezzanine. [`services/origin/session.json`](../services/origin/session.json) names the backup base URL. When origin A refuses a media segment, the same path is requested on origin B. Picture that continues, without restarting at the first segment, waits for an engine.
+`go run ./services/origin` serves `pipeline/protected/playpath-bars/` on `http://127.0.0.1:8080`. The same command with `-addr 127.0.0.1:8081` serves that tree on origin B. A GET of a menu or segment returns a content type and `Last-Modified`. The process does not list directories, and it does not serve the content key or the mezzanine. A page on exactly `http://127.0.0.1:5173` can read menus and segments. Any other origin gets no `Access-Control-Allow-Origin`. `OPTIONS` of a real file is 204. `OPTIONS` of `lab-key.json` or a missing path is 404. [`services/origin/session.json`](../services/origin/session.json) names the backup base URL. When origin A refuses a media segment, the same path is requested on origin B. Picture that continues, without restarting at the first segment, waits for an engine.
 
 No app language owns this phase.
 
@@ -161,6 +161,8 @@ The app asks an engine to play a URL. The engine fetches the menu, chooses the b
 
 Four engines means four failure modes. A bug in Media3 does not show up on iOS. That is why phase 10 uses one event shape.
 
+`apps/web` is the Chrome, Edge, and Firefox row for an encrypted title. `npm run dev` listens on `http://127.0.0.1:5173`. The session loads either protected menu with Shaka, and play, pause, and seek go through that session. Controls do not import Shaka. hls.js, Media3, and `AVPlayer` are not in this app.
+
 ### Phase 7 — License
 
 Phase 3 locked the files in advance. Phase 7 is per viewer, per device, at the moment they press play. The same ciphertext serves everyone. The key is personal.
@@ -171,7 +173,7 @@ Phase 3 locked the files in advance. Phase 7 is per viewer, per device, at the m
 
 hls.js is the wrong place to hang DRM. A title that needs DASH plus a key system belongs in Shaka.
 
-`go run ./services/license` listens on `http://127.0.0.1:8082`. `POST /` with the lab key id returns a Clear Key JSON Web Key set. An unknown key id gets a non-success status. The handler does not redirect to the clear package and does not log the key. A page on `http://127.0.0.1:5173` can read that response. If the key is late, startup time goes up. If it never comes, the screen stays black. That picture, and a `drm` error, wait for an app. The license service does not hand out the clear package instead.
+`go run ./services/license` listens on `http://127.0.0.1:8082`. `POST /` with the lab key id returns a Clear Key JSON Web Key set. An unknown key id gets a non-success status. The handler does not redirect to the clear package and does not log the key. A page on `http://127.0.0.1:5173` can read that response. The web session’s license call is the EME path Shaka drives, and the page does not read the key. If the key is late, startup time goes up. If it never comes, the screen stays black. That picture, and a `drm` error, still wait for a stopped license. The license service does not hand out the clear package instead.
 
 ### Phase 8 — Buffer, ABR, decode
 
@@ -238,7 +240,7 @@ sequenceDiagram
 
 ## 4. Repository layout
 
-The roadmap builds this tree. Today the repository contains `docs/`, this architecture, the root README, the MIT license, and the `pipeline/` commands. Those commands write the mezzanine, both menus, and the protected copy. The media files are build products and are not committed. `services/origin` is origin A and origin B. `services/ads` is the SSAI stitcher. `services/license` answers Clear Key and holds the published lab key. The apps are not created yet.
+The roadmap builds this tree. Today the repository contains `docs/`, this architecture, the root README, the MIT license, and the `pipeline/` commands. Those commands write the mezzanine, both menus, and the protected copy. The media files are build products and are not committed. `services/origin` is origin A and origin B. `services/ads` is the SSAI stitcher. `services/license` answers Clear Key and holds the published lab key. `apps/web` plays the protected menus with Shaka. Android, iOS, and React Native are not created yet.
 
 ```
 playpath-lab/
