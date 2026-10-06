@@ -4,7 +4,7 @@ import { bitrateEvent, type BitrateEngine } from "./bitrateEvent";
 import { chooseEngine } from "./chooseEngine";
 import { clearKeyLicenseUrl, drmServers } from "./drmServers";
 import { rewriteClearKeyPlaylist } from "./hlsClearKey";
-import { fetchMidroll } from "./midroll";
+import { fetchMidroll, playingAtCue } from "./midroll";
 
 export type PlaybackState = "playing" | "paused" | "seeking" | "ended";
 
@@ -22,6 +22,8 @@ export type PlaybackSnapshot = {
   bandwidthBps: number | undefined;
   error: string | undefined;
 };
+
+const metadataTimeoutMs = 5000;
 
 const videoEvents = [
   "play",
@@ -61,6 +63,8 @@ export class PlaybackSession {
   #creativeUrl: string | undefined = undefined;
   #adPlayed = false;
   #adPhase: AdPhase = "off";
+  #adAttempt = 0;
+  #creativeAssigned = false;
   #creativeStarted = false;
   #playWhenReady = false;
   #bound = false;
@@ -81,10 +85,11 @@ export class PlaybackSession {
     this.#publishFromVideo();
   };
   #onCreativeError = (): void => {
-    if (this.#adPhase !== "creative") {
+    if (this.#adPhase !== "creative" || !this.#creativeAssigned) {
       return;
     }
-    if (this.#video.currentSrc !== this.#creativeUrl) {
+    const src = this.#video.currentSrc;
+    if (src !== "" && src !== this.#creativeUrl) {
       return;
     }
     void this.#resumeFilm();
@@ -144,6 +149,8 @@ export class PlaybackSession {
     this.#creativeUrl = undefined;
     this.#adPlayed = false;
     this.#adPhase = "off";
+    this.#adAttempt += 1;
+    this.#creativeAssigned = false;
     this.#creativeStarted = false;
     this.#playWhenReady = false;
     await this.#releasePlayer();
@@ -467,10 +474,12 @@ export class PlaybackSession {
     if (this.#cueMs === undefined || this.#creativeUrl === undefined) {
       return false;
     }
-    if (!Number.isFinite(this.#video.currentTime) || this.#video.ended) {
-      return false;
-    }
-    return this.#video.currentTime * 1000 >= this.#cueMs;
+    return playingAtCue(
+      this.#video.currentTime * 1000,
+      this.#cueMs,
+      this.#video.paused,
+      this.#video.ended,
+    );
   }
 
   async #playCreative(): Promise<void> {
@@ -484,8 +493,10 @@ export class PlaybackSession {
     }
     this.#adPlayed = true;
     this.#adPhase = "creative";
+    this.#creativeAssigned = false;
     this.#shakaBuffering = false;
     const generation = this.#generation;
+    const attempt = this.#adAttempt;
     this.#video.addEventListener("error", this.#onCreativeError);
     this.#video.addEventListener("ended", this.#onCreativeEnded);
     try {
@@ -495,31 +506,46 @@ export class PlaybackSession {
         this.#hls.stopLoad();
         this.#hls.detachMedia();
       }
-      if (generation !== this.#generation) {
+      if (!this.#ownsCreative(generation, attempt)) {
         return;
       }
       this.#video.src = url;
-      if (!(await this.#waitForMetadata(generation, true))) {
+      this.#creativeAssigned = true;
+      const ready = await this.#waitForMetadata(generation, true);
+      if (!this.#ownsCreative(generation, attempt)) {
+        return;
+      }
+      if (!ready) {
+        await this.#resumeFilm();
         return;
       }
       this.#creativeStarted = true;
       this.#publishFromVideo();
       await this.#video.play();
     } catch {
-      if (generation !== this.#generation) {
+      if (!this.#ownsCreative(generation, attempt)) {
         return;
       }
       await this.#resumeFilm();
     }
   }
 
+  #ownsCreative(generation: number, attempt: number): boolean {
+    return (
+      generation === this.#generation &&
+      attempt === this.#adAttempt &&
+      this.#adPhase === "creative"
+    );
+  }
+
   async #resumeFilm(): Promise<void> {
     if (this.#adPhase !== "creative") {
       return;
     }
+    this.#adAttempt += 1;
     this.#adPhase = "resume";
+    this.#creativeAssigned = false;
     this.#creativeStarted = false;
-    this.#playWhenReady = true;
     this.#video.removeEventListener("error", this.#onCreativeError);
     this.#video.removeEventListener("ended", this.#onCreativeEnded);
     const generation = this.#generation;
@@ -529,6 +555,7 @@ export class PlaybackSession {
     this.#video.load();
     try {
       const engine = this.#engine;
+      let restored = false;
       if (engine === "shaka" && this.#player !== null) {
         await this.#player.attach(this.#video);
         if (generation !== this.#generation) {
@@ -539,21 +566,25 @@ export class PlaybackSession {
           return;
         }
         this.#video.currentTime = cueSec;
+        restored = true;
       } else if (engine === "hlsjs" && this.#hls !== null) {
         this.#hls.attachMedia(this.#video);
         this.#hls.startLoad(cueSec);
-        if (!(await this.#waitForMetadata(generation))) {
+        if (!(await this.#filmReady(generation))) {
           return;
         }
         this.#video.currentTime = cueSec;
+        restored = true;
       } else if (engine === "native") {
         this.#video.src = this.#manifestUrl;
-        if (!(await this.#waitForMetadata(generation, true))) {
+        if (!(await this.#filmReady(generation, true))) {
           return;
         }
         this.#video.currentTime = cueSec;
+        restored = true;
       }
-      if (generation !== this.#generation) {
+      if (!restored || generation !== this.#generation) {
+        this.#unlockAd(generation);
         return;
       }
       this.#adPhase = "off";
@@ -570,6 +601,26 @@ export class PlaybackSession {
     }
   }
 
+  async #filmReady(generation: number, nextEvent = false): Promise<boolean> {
+    const ready = await this.#waitForMetadata(generation, nextEvent);
+    if (generation !== this.#generation) {
+      return false;
+    }
+    if (!ready) {
+      this.#adPhase = "off";
+      this.#fail(new Error("playback"));
+    }
+    return ready;
+  }
+
+  #unlockAd(generation: number): void {
+    if (generation !== this.#generation || this.#adPhase === "off") {
+      return;
+    }
+    this.#adPhase = "off";
+    this.#fail(new Error("playback"));
+  }
+
   #waitForMetadata(generation: number, nextEvent = false): Promise<boolean> {
     if (
       !nextEvent &&
@@ -578,11 +629,23 @@ export class PlaybackSession {
       return Promise.resolve(generation === this.#generation);
     }
     return new Promise((resolve) => {
-      const done = (): void => {
-        this.#video.removeEventListener("loadedmetadata", done);
-        resolve(generation === this.#generation);
+      let settled = false;
+      const finish = (ready: boolean): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        this.#video.removeEventListener("loadedmetadata", onMetadata);
+        resolve(ready && generation === this.#generation);
       };
-      this.#video.addEventListener("loadedmetadata", done);
+      const onMetadata = (): void => {
+        finish(true);
+      };
+      const timer = setTimeout(() => {
+        finish(false);
+      }, metadataTimeoutMs);
+      this.#video.addEventListener("loadedmetadata", onMetadata);
     });
   }
 
@@ -593,6 +656,7 @@ export class PlaybackSession {
         : "Playback failed.";
     this.#set({
       ...this.#snapshot,
+      adPlaying: this.#adPhase !== "off",
       error: message,
     });
   }

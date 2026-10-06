@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readMidroll } from "./midroll";
+import { playingAtCue, readMidroll } from "./midroll";
 
 const document = `<?xml version="1.0" encoding="UTF-8"?>
 <VAST version="4.2">
@@ -33,5 +33,14 @@ describe("mid-roll document", () => {
 
   it("ignores a document with no creative", () => {
     expect(readMidroll(`<Cue timeOffset="00:00:10.000"/>`)).toBeUndefined();
+  });
+});
+
+describe("playing at the cue", () => {
+  it("starts only while the film is playing", () => {
+    expect(playingAtCue(15_000, 10_000, false, false)).toBe(true);
+    expect(playingAtCue(15_000, 10_000, true, false)).toBe(false);
+    expect(playingAtCue(9_000, 10_000, false, false)).toBe(false);
+    expect(playingAtCue(10_000, 10_000, false, true)).toBe(false);
   });
 });

@@ -38,6 +38,21 @@ export function readMidroll(xml: string): Midroll | undefined {
   return { cueMs, mediaUrl };
 }
 
+export function playingAtCue(
+  currentTimeMs: number,
+  cueMs: number,
+  paused: boolean,
+  ended: boolean,
+): boolean {
+  if (paused || ended) {
+    return false;
+  }
+  if (!Number.isFinite(currentTimeMs) || !Number.isFinite(cueMs)) {
+    return false;
+  }
+  return currentTimeMs >= cueMs;
+}
+
 export async function fetchMidroll(): Promise<Midroll | undefined> {
   try {
     const response = await fetch(midrollVastUrl, {
