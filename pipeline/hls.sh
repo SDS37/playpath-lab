@@ -48,6 +48,7 @@ keyint="$((idr_interval * frame_rate))"
 # and a segment cut every segment_duration seconds so each segment starts
 # on an IDR (items 1.13, 7.4, 7.5, 7.6). movflags=+cmaf asks the MP4 muxer
 # for CMAF fragments. https://ffmpeg.org/ffmpeg-formats.html#mov_002c-mp4_002c-ismv
+# A variant stream map renames the init file to init_<index>.mp4. The playlist records that name.
 ffmpeg -y -hide_banner \
   -i "${video}" \
   -filter_complex "[0:v]split=2[v1080][v720];[v720]scale=1280:720:flags=bicubic[v720s]" \
