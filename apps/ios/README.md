@@ -10,13 +10,13 @@ Requires the clear package and an iOS simulator. From `apps/ios`:
 xcodebuild -project Playpath.xcodeproj -scheme Playpath -sdk iphonesimulator -configuration Debug -derivedDataPath build build
 ```
 
-The simulator shares the host’s `127.0.0.1`, so the menu URL does not need a port reverse. Install `build/Build/Products/Debug-iphonesimulator/Playpath.app` and open it. On an iOS 27 simulator the screen shows the color bars and Pause while the picture changes. The license log does not record a request from that play. The session logs `bitrate` from the access log and the presentation height. The controls do not pick a rung. A step down on the simulator is still open.
+The simulator shares the host’s `127.0.0.1`, so the menu URL does not need a port reverse. The ads service is `http://127.0.0.1:8083`. Install `build/Build/Products/Debug-iphonesimulator/Playpath.app` and open it. On an iOS 27 simulator the screen shows the color bars and Pause while the picture changes. The license log does not record a request from that play. The session logs `bitrate` from the access log and the presentation height. The controls do not pick a rung. A step down on the simulator is still open.
 
-`PlaybackSession` creates an `AVPlayer` for that URL, observes `timeControlStatus`, the item status, and the access log. The picture is an `AVPlayerLayer`. Play and pause go through the session. The session does not choose a rung. The system transport bar is off. Entering the background pauses playback.
+`PlaybackSession` creates an `AVPlayer` for that URL, observes `timeControlStatus`, the item status, and the access log. The picture is an `AVPlayerLayer`. Play, pause, and seek go through the session. At 10 seconds the session plays the VAST creative, seek is disabled, a drag leaves the creative, and the film continues from the cue. The impression URL is not requested. The session does not choose a rung. The system transport bar is off. Entering the background pauses playback.
 
 ## Screen
 
-`SceneDelegate` shows `PlayerViewController`. That controller keeps the session and `PlaybackControlsView`. The controls draw Pause while the engine is playing or seeking, and Play while it is paused or ended. A failed item says “Playback failed.”
+`SceneDelegate` shows `PlayerViewController`. That controller keeps the session and `PlaybackControlsView`. The controls draw Pause while the engine is playing or seeking, and Play while it is paused or ended. Seek is disabled during the mid-roll, and the time label reads Ad. Color, type, and spacing are set on the views. A failed item says “Playback failed.”
 
 ```mermaid
 flowchart TD
@@ -24,7 +24,7 @@ flowchart TD
   screen --> controls["PlaybackControlsView"]
   screen --> session["PlaybackSession"]
   session --> player["AVPlayer"]
-  controls -->|play, pause| session
+  controls -->|play, pause, seek| session
   session -->|snapshot| controls
 ```
 

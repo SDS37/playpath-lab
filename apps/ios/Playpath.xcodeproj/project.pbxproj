@@ -12,6 +12,7 @@
 		B10000000000000000000003 /* PlaybackSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000003 /* PlaybackSession.swift */; };
 		B10000000000000000000004 /* PlaybackControlsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000004 /* PlaybackControlsView.swift */; };
 		B10000000000000000000005 /* PlayerViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000005 /* PlayerViewController.swift */; };
+		B10000000000000000000006 /* Midroll.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000008 /* Midroll.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -20,6 +21,7 @@
 		A10000000000000000000003 /* PlaybackSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackSession.swift; sourceTree = "<group>"; };
 		A10000000000000000000004 /* PlaybackControlsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackControlsView.swift; sourceTree = "<group>"; };
 		A10000000000000000000005 /* PlayerViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerViewController.swift; sourceTree = "<group>"; };
+		A10000000000000000000008 /* Midroll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Midroll.swift; sourceTree = "<group>"; };
 		A10000000000000000000006 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A10000000000000000000007 /* Playpath.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Playpath.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -49,6 +51,7 @@
 				A10000000000000000000001 /* AppDelegate.swift */,
 				A10000000000000000000002 /* SceneDelegate.swift */,
 				A10000000000000000000003 /* PlaybackSession.swift */,
+				A10000000000000000000008 /* Midroll.swift */,
 				A10000000000000000000004 /* PlaybackControlsView.swift */,
 				A10000000000000000000005 /* PlayerViewController.swift */,
 				A10000000000000000000006 /* Info.plist */,
@@ -123,6 +126,7 @@
 				B10000000000000000000001 /* AppDelegate.swift in Sources */,
 				B10000000000000000000002 /* SceneDelegate.swift in Sources */,
 				B10000000000000000000003 /* PlaybackSession.swift in Sources */,
+				B10000000000000000000006 /* Midroll.swift in Sources */,
 				B10000000000000000000004 /* PlaybackControlsView.swift in Sources */,
 				B10000000000000000000005 /* PlayerViewController.swift in Sources */,
 			);
