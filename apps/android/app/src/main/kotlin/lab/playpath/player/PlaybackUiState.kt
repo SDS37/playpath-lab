@@ -15,5 +15,6 @@ data class PlaybackUiState(
     val durationMs: Long = 0,
     val height: Int = 0,
     val bandwidthBps: Int = 0,
+    val captions: Boolean = true,
     val error: String? = null,
 )

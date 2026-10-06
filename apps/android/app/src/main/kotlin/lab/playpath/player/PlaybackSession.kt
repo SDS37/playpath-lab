@@ -75,6 +75,7 @@ class PlaybackSession(
     private var creativeStarted = false
     private var startupLogged = false
     private var loadStartedAt = 0L
+    private var captions = true
     private val sessionJob = SupervisorJob()
     private val scope = CoroutineScope(sessionJob + Dispatchers.Main.immediate)
     private val httpFactory = DefaultHttpDataSource.Factory().setUserAgent("playpath-android")
@@ -96,6 +97,7 @@ class PlaybackSession(
             .build()
         player.addListener(this)
         player.addAnalyticsListener(this)
+        applyCaptions()
         scope.launch {
             while (isActive) {
                 if (!released && adPhase == AdPhase.Off && atCue()) {
@@ -138,7 +140,7 @@ class PlaybackSession(
         startupLogged = false
         loadStartedAt = SystemClock.elapsedRealtime()
         this.manifestUrl = manifestUrl
-        snapshot = PlaybackUiState()
+        snapshot = PlaybackUiState(captions = captions)
         publish()
         val attempt = adAttempt
         player.setMediaItem(filmItem(manifestUrl))
@@ -179,6 +181,15 @@ class PlaybackSession(
             return
         }
         player.pause()
+        publish()
+    }
+
+    fun setCaptions(enabled: Boolean) {
+        if (released) {
+            return
+        }
+        captions = enabled
+        applyCaptions()
         publish()
     }
 
@@ -424,10 +435,20 @@ class PlaybackSession(
             durationMs = if (duration > 0) duration else 0,
             height = recordedHeight,
             bandwidthBps = recordedBandwidth,
+            captions = captions,
             error = error,
         )
         snapshot = next
         onState(next)
+    }
+
+    private fun applyCaptions() {
+        player.trackSelectionParameters = player.trackSelectionParameters
+            .buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, !captions)
+            .setPreferredTextLanguage(if (captions) "en" else null)
+            .setSelectUndeterminedTextLanguage(captions)
+            .build()
     }
 
     private fun filmItem(manifestUrl: String): MediaItem {
