@@ -92,24 +92,31 @@ func TestWebOriginCanReadAMenu(t *testing.T) {
 	preflight.Header.Set("Origin", webOrigin)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, preflight)
-	if rec.Code != http.StatusNoContent || rec.Header().Get("Access-Control-Allow-Origin") != webOrigin {
-		t.Fatalf("preflight %d origin %q", rec.Code, rec.Header().Get("Access-Control-Allow-Origin"))
+	if rec.Code != http.StatusNoContent || rec.Header().Get("Access-Control-Allow-Origin") != webOrigin || rec.Header().Get("Vary") != "Origin" {
+		t.Fatalf("preflight %d origin %q vary %q", rec.Code, rec.Header().Get("Access-Control-Allow-Origin"), rec.Header().Get("Vary"))
 	}
 
 	get := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8080/manifest.mpd", nil)
 	get.Header.Set("Origin", webOrigin)
 	rec = httptest.NewRecorder()
 	handler.ServeHTTP(rec, get)
-	if rec.Code != http.StatusOK || rec.Header().Get("Access-Control-Allow-Origin") != webOrigin {
-		t.Fatalf("get %d origin %q", rec.Code, rec.Header().Get("Access-Control-Allow-Origin"))
+	if rec.Code != http.StatusOK || rec.Header().Get("Access-Control-Allow-Origin") != webOrigin || rec.Header().Get("Vary") != "Origin" {
+		t.Fatalf("get %d origin %q vary %q", rec.Code, rec.Header().Get("Access-Control-Allow-Origin"), rec.Header().Get("Vary"))
 	}
 
 	other := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8080/manifest.mpd", nil)
 	other.Header.Set("Origin", "http://example.test")
 	rec = httptest.NewRecorder()
 	handler.ServeHTTP(rec, other)
-	if rec.Header().Get("Access-Control-Allow-Origin") != "" {
-		t.Fatalf("unexpected origin %q", rec.Header().Get("Access-Control-Allow-Origin"))
+	if rec.Header().Get("Access-Control-Allow-Origin") != "" || rec.Header().Get("Vary") != "Origin" {
+		t.Fatalf("unexpected origin %q vary %q", rec.Header().Get("Access-Control-Allow-Origin"), rec.Header().Get("Vary"))
+	}
+
+	plain := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8080/manifest.mpd", nil)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, plain)
+	if rec.Header().Get("Access-Control-Allow-Origin") != "" || rec.Header().Get("Vary") != "Origin" {
+		t.Fatalf("plain origin %q vary %q", rec.Header().Get("Access-Control-Allow-Origin"), rec.Header().Get("Vary"))
 	}
 
 	hidden := httptest.NewRequest(http.MethodOptions, "http://127.0.0.1:8080/lab-key.json", nil)

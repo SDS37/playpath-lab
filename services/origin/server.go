@@ -89,6 +89,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) allowWeb(w http.ResponseWriter, r *http.Request) {
+	// Vary is set before the origin check so a cache cannot reuse a response
+	// that was stored without the web origin's CORS headers.
+	w.Header().Set("Vary", "Origin")
 	if r.Header.Get("Origin") != webOrigin {
 		return
 	}
@@ -96,7 +99,6 @@ func (s *Server) allowWeb(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Range")
 	w.Header().Set("Access-Control-Expose-Headers", "Accept-Ranges, Content-Length, Content-Range, Content-Type")
-	w.Header().Set("Vary", "Origin")
 }
 
 func (s *Server) exists(urlPath string) bool {
