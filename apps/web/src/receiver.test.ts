@@ -8,7 +8,12 @@ vi.mock("shaka-player", () => ({
         return true;
       }
     },
-    util: { Error: { Category: { DRM: 6 } } },
+    util: {
+      Error: {
+        Category: { DRM: 6 },
+        Severity: { CRITICAL: 2, RECOVERABLE: 1 },
+      },
+    },
   },
 }));
 import { clearKeyLicenseUrl } from "./drmServers";
@@ -16,6 +21,7 @@ import { protectedMenus } from "./protectedMenus";
 import {
   loadReceiver,
   receiverFailure,
+  ReceiverSuperseded,
   ReceiverUnsupported,
   stopReceiver,
   type ReceiverPlayer,
@@ -77,5 +83,61 @@ describe("receiver page", () => {
         data: ["ffefcdab"],
       }),
     ).toBe("The title cannot be played.");
+  });
+
+  it("keeps the original failure when destroy rejects", async () => {
+    const { player, load, destroy } = fakePlayer();
+    load.mockRejectedValue(new Error("ffefcdab"));
+    destroy.mockRejectedValue(new Error("destroy failed"));
+    await expect(
+      loadReceiver({} as HTMLMediaElement, () => player),
+    ).rejects.toThrow("ffefcdab");
+  });
+
+  it("lets the newer load own the player", async () => {
+    const first = fakePlayer();
+    let finishAttach: () => void = () => undefined;
+    first.attach.mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishAttach = resolve;
+      }),
+    );
+    const video = {} as HTMLMediaElement;
+    const pending = loadReceiver(video, () => first.player);
+    await Promise.resolve();
+    const second = fakePlayer();
+    const next = loadReceiver(video, () => second.player);
+    finishAttach();
+    await expect(pending).rejects.toBeInstanceOf(ReceiverSuperseded);
+    await next;
+    expect(second.destroy).not.toHaveBeenCalled();
+    await stopReceiver();
+    expect(second.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a critical error and ignores a recoverable one", async () => {
+    const seen: unknown[] = [];
+    let onShakaError: ((event: Event) => void) | undefined;
+    const { player } = fakePlayer();
+    player.addEventListener = (_type, listener) => {
+      onShakaError = listener;
+    };
+    await loadReceiver(
+      {} as HTMLMediaElement,
+      () => player,
+      (err) => {
+        seen.push(err);
+      },
+    );
+    const recoverable = { detail: { severity: 1, category: 6 } };
+    onShakaError?.(recoverable as unknown as Event);
+    expect(seen).toEqual([]);
+    const critical = {
+      detail: { severity: 2, category: 6, data: ["ffefcdab"] },
+    };
+    onShakaError?.(critical as unknown as Event);
+    expect(seen).toEqual([critical]);
+    expect(receiverFailure(critical)).toBe("The title cannot be played.");
+    await stopReceiver();
   });
 });

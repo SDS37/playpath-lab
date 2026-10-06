@@ -9,9 +9,9 @@ export type ReceiverPlayer = {
   }): boolean;
   load(manifestUrl: string): Promise<unknown>;
   destroy(): Promise<void>;
+  addEventListener?(type: "error", listener: (event: Event) => void): void;
 };
 
-/** The desktop page cannot play here. Certification is a different runtime. */
 export class ReceiverUnsupported extends Error {
   constructor() {
     super("This browser cannot play the title.");
@@ -19,16 +19,39 @@ export class ReceiverUnsupported extends Error {
   }
 }
 
+export class ReceiverSuperseded extends Error {
+  constructor() {
+    super("superseded");
+    this.name = "ReceiverSuperseded";
+  }
+}
+
 let current: ReceiverPlayer | undefined;
+let generation = 0;
 
 export async function loadReceiver(
   video: HTMLMediaElement,
   createPlayer: () => ReceiverPlayer = createShakaPlayer,
+  onError?: (err: unknown) => void,
 ): Promise<void> {
+  const token = ++generation;
+  await releaseCurrent();
+  if (token !== generation) {
+    throw new ReceiverSuperseded();
+  }
   const player = createPlayer();
   current = player;
+  player.addEventListener?.("error", (event) => {
+    if (current !== player || !isCritical(event)) {
+      return;
+    }
+    onError?.(event);
+  });
   try {
     await player.attach(video);
+    if (token !== generation) {
+      throw new ReceiverSuperseded();
+    }
     const applied = player.configure({
       drm: { servers: { ...drmServers() } },
     });
@@ -36,21 +59,25 @@ export async function loadReceiver(
       throw new Error("configure");
     }
     await player.load(protectedMenus.dash);
+    if (token !== generation) {
+      throw new ReceiverSuperseded();
+    }
   } catch (err) {
-    await destroyCurrent();
+    await releasePlayer(player);
     throw err;
   }
 }
 
 export async function stopReceiver(): Promise<void> {
-  await destroyCurrent();
+  generation += 1;
+  await releaseCurrent();
 }
 
 export function receiverFailure(err: unknown): string {
   if (err instanceof ReceiverUnsupported) {
     return err.message;
   }
-  if (categoryOf(err) === shaka.util.Error.Category.DRM) {
+  if (numberField(err, "category") === shaka.util.Error.Category.DRM) {
     return "The title cannot be played.";
   }
   return "Playback failed.";
@@ -64,23 +91,42 @@ function createShakaPlayer(): ReceiverPlayer {
   return new shaka.Player();
 }
 
-async function destroyCurrent(): Promise<void> {
+async function releaseCurrent(): Promise<void> {
   const player = current;
-  current = undefined;
-  if (player !== undefined) {
-    await player.destroy();
+  if (player === undefined) {
+    return;
   }
+  await releasePlayer(player);
 }
 
-function categoryOf(err: unknown): number | undefined {
-  if (typeof err !== "object" || err === null) {
+async function releasePlayer(player: ReceiverPlayer): Promise<void> {
+  if (current === player) {
+    current = undefined;
+  }
+  await player.destroy().catch(() => undefined);
+}
+
+function isCritical(err: unknown): boolean {
+  return numberField(err, "severity") === shaka.util.Error.Severity.CRITICAL;
+}
+
+function numberField(
+  err: unknown,
+  name: "category" | "severity",
+  depth = 0,
+): number | undefined {
+  if (depth > 4 || typeof err !== "object" || err === null) {
     return undefined;
   }
-  if ("detail" in err) {
-    return categoryOf(err.detail);
+  if ("detail" in err && err.detail !== err) {
+    const nested = numberField(err.detail, name, depth + 1);
+    if (nested !== undefined) {
+      return nested;
+    }
   }
-  if ("category" in err && typeof err.category === "number") {
-    return err.category;
+  const value: unknown = (err as Record<string, unknown>)[name];
+  if (typeof value === "number") {
+    return value;
   }
   return undefined;
 }
