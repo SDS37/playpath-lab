@@ -3,6 +3,14 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      input: {
+        main: "index.html",
+        receiver: "receiver.html",
+      },
+    },
+  },
   server: {
     host: "127.0.0.1",
     port: 5173,
