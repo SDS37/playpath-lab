@@ -8,7 +8,9 @@ type ControlsProps = {
 };
 
 export function Controls({ snapshot, onPlay, onPause, onSeek }: ControlsProps) {
-  const showPause = snapshot.playbackState === "playing";
+  const showPause =
+    snapshot.playbackState === "playing" ||
+    snapshot.playbackState === "seeking";
   const progress =
     snapshot.durationMs === 0
       ? "0%"

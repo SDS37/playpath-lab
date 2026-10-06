@@ -8,11 +8,13 @@ Stalls, quality, and ad cuts are phase 8 and phase 5. This document does not cha
 
 | Control | Intent | When it is shown |
 |---|---|---|
-| Play | `play` | Engine state is paused or ended |
-| Pause | `pause` | Engine state is playing |
+| Play | `play` | `playbackState` is `paused` or `ended` |
+| Pause | `pause` | `playbackState` is `playing` or `seeking` |
 | Seek | `seek` to a position in milliseconds | Always visible, disabled while a CSAI creative is playing |
 | Time | none | Current position and duration from the engine |
 | Title | none | `playpath-bars` |
+
+A seek that starts while the media is paused keeps `playbackState` as `paused`, so the glyph stays Play. A seek during playback reports `seeking`, and the glyph stays Pause.
 
 Captions are a toggle that selects the text track the menu already contains. The toggle calls the session. It does not swap the master file.
 

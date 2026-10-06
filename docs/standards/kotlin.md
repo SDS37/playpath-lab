@@ -58,7 +58,8 @@ fun PlaybackControls(
     onPause: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val showPause = state.playbackState == PlaybackState.Playing
+    val showPause = state.playbackState == PlaybackState.Playing ||
+        state.playbackState == PlaybackState.Seeking
     Button(onClick = if (showPause) onPause else onPlay, modifier = modifier) {
         Text(text = if (showPause) "Pause" else "Play")
     }

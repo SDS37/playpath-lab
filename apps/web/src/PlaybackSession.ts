@@ -231,11 +231,11 @@ function stateOf(video: HTMLVideoElement): PlaybackState {
   if (video.ended) {
     return "ended";
   }
-  if (video.seeking) {
-    return "seeking";
-  }
   if (video.paused) {
     return "paused";
+  }
+  if (video.seeking) {
+    return "seeking";
   }
   return "playing";
 }

@@ -38,7 +38,7 @@ type ControlsProps = {
 };
 
 export function Controls({ playbackState, onPlay, onPause }: ControlsProps) {
-  const showPause = playbackState === "playing";
+  const showPause = playbackState === "playing" || playbackState === "seeking";
   return (
     <button type="button" className="control" onClick={showPause ? onPause : onPlay}>
       {showPause ? "Pause" : "Play"}
