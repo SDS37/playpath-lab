@@ -2,5 +2,6 @@ go 1.22
 
 use (
 	./services/ads
+	./services/license
 	./services/origin
 )

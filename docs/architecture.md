@@ -2,7 +2,7 @@
 
 PlayPath is a lab for one streaming path. The title is prepared before any app runs. Each device then plays it with the engine that platform already has.
 
-This document describes the **target** the PoC will run. Nothing in the tree below is implemented yet. Week-by-week order is the [roadmap](roadmap.md). Choices are the [ADRs](architecture-decision-records.md). The proof for each box is a row in the [technical requirements](technical-requirements.md).
+This document describes the path the PoC runs. The pipeline, both origins, the ads service, and the Clear Key license service are built. The apps are not, so nothing here claims a player is running. Week-by-week order is the [roadmap](roadmap.md). Choices are the [ADRs](architecture-decision-records.md). The proof for each box is a row in the [technical requirements](technical-requirements.md).
 
 **How to read the diagrams.** Solid arrows are the happy path. The license step fails closed: no key, no picture. The ad stitcher fails open: no personalised menu, play the clean film.
 
@@ -126,7 +126,7 @@ The lab key system is W3C Clear Key. Production devices do not share one DRM:
 
 Clear Key proves the encrypt-then-license shape on web and Android. It does not prove a production CDM. See [ADR-003](architecture-decision-records.md).
 
-`./pipeline/encrypt.sh` reads the published lab key from `services/license/lab-key.json` and writes a protected copy at `pipeline/protected/playpath-bars/`. The copy is the same CMAF timeline, with MPEG-CENC sample encryption. The HLS menu and the DASH menu name that key id and the Clear Key system `org.w3.clearkey`. Captions stay in the clear. The clear package under `pipeline/package/playpath-bars/` stays, because iOS and hls.js play clear HLS. The key bytes stay in the license config. Apps do not receive them. FairPlay, Widevine, and PlayReady stay named in the [engine map](engines.md) and are not reported as passing. They need vendor credentials. See [beyond-poc.md](beyond-poc.md).
+`./pipeline/encrypt.sh` reads the published lab key from `services/license/lab-key.json` and writes a protected copy at `pipeline/protected/playpath-bars/`. A failed run removes its temporary copy and leaves an existing protected tree in place. The copy is the same CMAF timeline, with MPEG-CENC sample encryption. The HLS menu and the DASH menu name that key id and the Clear Key system `org.w3.clearkey`. Captions stay in the clear. The clear package under `pipeline/package/playpath-bars/` stays, because iOS and hls.js play clear HLS. The key bytes stay in the license config. Apps do not receive them. FairPlay, Widevine, and PlayReady stay named in the [engine map](engines.md) and are not reported as passing. They need vendor credentials. See [beyond-poc.md](beyond-poc.md).
 
 ### Phase 4 — CDN
 
@@ -144,7 +144,7 @@ A break is either cut into the stream on the server, or played by the app as a s
 - **CSAI.** The film menu stays intact. At 10 seconds the engine pauses, the app reads a VAST document, the engine plays the creative, then seeks back to that second.
 - The app fires an impression for both, so a stitched ad is still counted.
 
-`./pipeline/preroll.sh` writes a clear pre-roll of about 5 seconds and a progressive file of that creative. `go run ./services/ads` listens on `http://127.0.0.1:8083` and returns one HLS menu and one DASH MPD. Each starts with that pre-roll and then the film. Film bytes stay on origin A. The clean menus stay at `http://127.0.0.1:8080/master.m3u8` and `http://127.0.0.1:8080/manifest.mpd`. The ads process answers 404 for those paths and does not redirect to them. [`services/ads/session.json`](../services/ads/session.json) names the clean menu when the stitched URL fails. That choice does not request an impression. `GET /vast/midroll.xml` is one linear creative, an impression URL, and a cue at 10 seconds into the film. Picture of either break, the return to that second, picture of the clean film after the stitcher stops, and the `ad` impressions, wait for an app.
+`./pipeline/preroll.sh` writes a clear pre-roll of about 5 seconds and a progressive file of that creative. `go run ./services/ads` listens on `http://127.0.0.1:8083` only when those pre-roll paths are regular files, and returns one HLS menu and one DASH MPD. Each starts with that pre-roll and then the film. Film bytes stay on origin A. The clean menus stay at `http://127.0.0.1:8080/master.m3u8` and `http://127.0.0.1:8080/manifest.mpd`. The ads process answers 404 for those paths and for `duration.txt`, in any case, and does not redirect to them. [`services/ads/session.json`](../services/ads/session.json) names the clean menu when the stitched URL fails. That choice does not request an impression. `GET /vast/midroll.xml` is one linear creative, an impression URL, and a cue at 10 seconds into the film. Picture of either break, the return to that second, picture of the clean film after the stitcher stops, and the `ad` impressions, wait for an app.
 
 ### Phase 6 — The app and the engines
 
@@ -171,7 +171,7 @@ Phase 3 locked the files in advance. Phase 7 is per viewer, per device, at the m
 
 hls.js is the wrong place to hang DRM. A title that needs DASH plus a key system belongs in Shaka.
 
-If the key is late, startup time goes up. If it never comes, the screen stays black. The license service does not hand out the clear package instead.
+`go run ./services/license` listens on `http://127.0.0.1:8082`. `POST /` with the lab key id returns a Clear Key JSON Web Key set. An unknown key id gets a non-success status. The handler does not redirect to the clear package and does not log the key. A page on `http://127.0.0.1:5173` can read that response. If the key is late, startup time goes up. If it never comes, the screen stays black. That picture, and a `drm` error, wait for an app. The license service does not hand out the clear package instead.
 
 ### Phase 8 — Buffer, ABR, decode
 
@@ -238,7 +238,7 @@ sequenceDiagram
 
 ## 4. Repository layout
 
-The roadmap builds this tree. Today the repository contains `docs/`, this architecture, the root README, the license, `pipeline/` for the mezzanine, the HLS menu, the DASH menu, and the protected copy, `services/origin` for origin A and origin B, `services/ads` for the SSAI stitcher, and `services/license/lab-key.json` for the published lab key.
+The roadmap builds this tree. Today the repository contains `docs/`, this architecture, the root README, the MIT license, and the `pipeline/` commands. Those commands write the mezzanine, both menus, and the protected copy. The media files are build products and are not committed. `services/origin` is origin A and origin B. `services/ads` is the SSAI stitcher. `services/license` answers Clear Key and holds the published lab key. The apps are not created yet.
 
 ```
 playpath-lab/

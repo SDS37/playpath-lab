@@ -58,12 +58,14 @@ Log the status and the key id. Do not log the key.
 services/origin/
   main.go
   server.go
+  session.go
 services/license/
   main.go
   clearkey.go
 services/ads/
   main.go
   stitch.go
+  fallback.go
   vast/
     midroll.xml
 ```
