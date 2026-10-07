@@ -20,16 +20,43 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     reactNativeDelegate = delegate
     reactNativeFactory = factory
+    return true
+  }
 
-    window = UIWindow(frame: UIScreen.main.bounds)
+  func application(
+    _ application: UIApplication,
+    configurationForConnecting connectingSceneSession: UISceneSession,
+    options: UIScene.ConnectionOptions
+  ) -> UISceneConfiguration {
+    let configuration = UISceneConfiguration(
+      name: "Default Configuration",
+      sessionRole: connectingSceneSession.role
+    )
+    configuration.delegateClass = SceneDelegate.self
+    return configuration
+  }
 
-    factory.startReactNative(
+  func startReactNative(in window: UIWindow) {
+    self.window = window
+    reactNativeFactory?.startReactNative(
       withModuleName: "PlaypathMobile",
       in: window,
-      launchOptions: launchOptions
+      launchOptions: nil
     )
+  }
+}
 
-    return true
+class SceneDelegate: UIResponder, UIWindowSceneDelegate {
+  func scene(
+    _ scene: UIScene,
+    willConnectTo session: UISceneSession,
+    options connectionOptions: UIScene.ConnectionOptions
+  ) {
+    guard let windowScene = scene as? UIWindowScene else {
+      return
+    }
+    let window = UIWindow(windowScene: windowScene)
+    (UIApplication.shared.delegate as? AppDelegate)?.startReactNative(in: window)
   }
 }
 

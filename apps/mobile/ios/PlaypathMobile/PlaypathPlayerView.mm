@@ -5,6 +5,7 @@
 #import <react/renderer/components/PlaypathPlayerViewSpec/Props.h>
 #import <react/renderer/components/PlaypathPlayerViewSpec/RCTComponentViewHelpers.h>
 
+#import <React_RCTAppDelegate/RCTDefaultReactNativeFactoryDelegate.h>
 #import "PlaypathMobile-Swift.h"
 
 using namespace facebook::react;
@@ -17,9 +18,11 @@ using namespace facebook::react;
   NSMutableArray<NSString *> *_pendingEvents;
 }
 
-- (instancetype)init
+- (instancetype)initWithFrame:(CGRect)frame
 {
-  if (self = [super init]) {
+  if (self = [super initWithFrame:frame]) {
+    static const auto defaultProps = std::make_shared<const PlaypathPlayerViewProps>();
+    _props = defaultProps;
     _session = [PlaypathSession new];
     __weak PlaypathPlayerView *weakSelf = self;
     _session.onPlaybackEvent = ^(NSString *json) {

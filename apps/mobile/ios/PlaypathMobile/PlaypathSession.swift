@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import UIKit
 
 /// AVPlayer renders the picture. JavaScript never sees samples.
 @objc(PlaypathSession)
