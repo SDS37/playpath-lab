@@ -7,6 +7,15 @@ export default defineConfig(
   { ignores: ["dist/**", "node_modules/**"] },
   js.configs.recommended,
   {
+    files: ["demo-server.mjs"],
+    languageOptions: {
+      globals: {
+        Buffer: "readonly",
+        fetch: "readonly",
+      },
+    },
+  },
+  {
     files: ["src/**/*.{ts,tsx}"],
     extends: [tseslint.configs.recommendedTypeChecked],
     languageOptions: {

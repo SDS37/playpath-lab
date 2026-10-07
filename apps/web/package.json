@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
+    "demo": "VITE_PROTECTED_DASH=/origin/manifest.mpd VITE_PROTECTED_HLS=/origin/master.m3u8 VITE_CLEAR_HLS=/clear/master.m3u8 VITE_LICENSE_URL=/license/ npm run build && node demo-server.mjs",
     "build": "tsc --noEmit && vite build",
     "lint": "eslint .",
     "test": "vitest run",
