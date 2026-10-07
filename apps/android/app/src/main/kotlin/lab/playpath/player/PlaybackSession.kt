@@ -10,7 +10,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -20,6 +19,7 @@ import androidx.media3.exoplayer.drm.DefaultDrmSessionManager
 import androidx.media3.exoplayer.drm.FrameworkMediaDrm
 import androidx.media3.exoplayer.drm.HttpMediaDrmCallback
 import androidx.media3.exoplayer.drm.KeyRequestInfo
+import androidx.media3.exoplayer.source.MediaLoadData
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
@@ -215,34 +215,20 @@ class PlaybackSession(
         player.release()
     }
 
-    override fun onTracksChanged(tracks: Tracks) {
+    override fun onDownstreamFormatChanged(
+        eventTime: AnalyticsListener.EventTime,
+        mediaLoadData: MediaLoadData,
+    ) {
         if (released || adPhase != AdPhase.Off) {
             return
         }
-        var height = 0
-        var bandwidth = 0
-        var codecs = ""
-        for (group in tracks.groups) {
-            if (group.type != C.TRACK_TYPE_VIDEO) {
-                continue
-            }
-            for (index in 0 until group.length) {
-                if (!group.isTrackSelected(index)) {
-                    continue
-                }
-                val format = group.getTrackFormat(index)
-                if (format.height > 0) {
-                    height = format.height
-                }
-                if (format.bitrate > 0) {
-                    bandwidth = format.bitrate
-                }
-                val formatCodecs = format.codecs
-                if (!formatCodecs.isNullOrEmpty()) {
-                    codecs = formatCodecs
-                }
-            }
+        if (mediaLoadData.trackType != C.TRACK_TYPE_VIDEO) {
+            return
         }
+        val format = mediaLoadData.trackFormat ?: return
+        val height = format.height.coerceAtLeast(0)
+        val bandwidth = format.bitrate.coerceAtLeast(0)
+        val codecs = format.codecs ?: ""
         if ((height == 0 && bandwidth == 0) ||
             (height == recordedHeight && bandwidth == recordedBandwidth)
         ) {
