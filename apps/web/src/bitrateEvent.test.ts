@@ -37,7 +37,8 @@ describe("bitrate event", () => {
       codecs: "avc1\nmp4a\r",
     });
     expect(event).not.toMatch(/[\n\r]/);
-    expect(JSON.parse(event).codecs).toBe("avc1\nmp4a\r");
+    const parsed = JSON.parse(event) as { codecs: string };
+    expect(parsed.codecs).toBe("avc1\nmp4a\r");
   });
 
   it("records startup and the mid-roll with the same field names", () => {
