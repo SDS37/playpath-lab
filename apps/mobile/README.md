@@ -23,4 +23,4 @@ That compile and those tests passed. On the emulator the TypeScript controls sho
 
 ## iOS toolchain
 
-`bundle exec pod install` with Homebrew Ruby 4.0.7 installs CocoaPods 1.15.2 and builds the app. The system Ruby 2.6.10 still stops while compiling the `json` gem. A JavaScript player was not added to finish the story.
+`bundle exec pod install` with Homebrew Ruby 4.0.7 installs CocoaPods 1.15.2. The iOS app was built from that workspace. The system Ruby 2.6.10 still stops while compiling the `json` gem. A JavaScript player was not added to finish the story.
