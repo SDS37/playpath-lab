@@ -44,6 +44,11 @@
     "name": "PlaypathPlayerViewSpec",
     "type": "components",
     "jsSrcsDir": "specs",
+    "ios": {
+      "componentProvider": {
+        "PlaypathPlayerView": "PlaypathPlayerView"
+      }
+    },
     "android": {
       "javaPackageName": "lab.playpath.mobile"
     }
