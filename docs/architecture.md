@@ -2,7 +2,7 @@
 
 PlayPath is a lab for one streaming path. The title is prepared before any app runs. Each device then plays it with the engine that platform already has.
 
-This document describes the path the PoC runs. The pipeline, both origins, the ads service, the Clear Key license service, and the web app are built. Android, iOS, and React Native are not, so nothing here claims those players are running. Week-by-week order is the [roadmap](roadmap.md). Choices are the [ADRs](architecture-decision-records.md). The proof for each box is a row in the [technical requirements](technical-requirements.md).
+This document describes the path the PoC runs. The pipeline, both origins, the ads service, the Clear Key license service, and the web app are built. Android, iOS, and React Native play the title. Week-by-week order is the [roadmap](roadmap.md). Choices are the [ADRs](architecture-decision-records.md). The proof for each box is a row in the [technical requirements](technical-requirements.md).
 
 **How to read the diagrams.** Solid arrows are the happy path. The license step fails closed: no key, no picture. The ad stitcher fails open: no personalised menu, play the clean film.
 
@@ -240,7 +240,7 @@ sequenceDiagram
 
 ## 4. Repository layout
 
-The roadmap builds this tree. Today the repository contains `docs/`, this architecture, the root README, the MIT license, and the `pipeline/` commands. Those commands write the mezzanine, both menus, and the protected copy. The media files are build products and are not committed. `services/origin` is origin A and origin B. `services/ads` is the SSAI stitcher. `services/license` answers Clear Key and holds the published lab key. `apps/web` plays the protected menus with Shaka and clear HLS with hls.js. `apps/android` plays the encrypted DASH menu with Media3. `apps/ios` plays clear HLS with `AVPlayer`. `apps/mobile` is the React Native app. It has not been observed playing.
+The roadmap builds this tree. Today the repository contains `docs/`, this architecture, the root README, the MIT license, and the `pipeline/` commands. Those commands write the mezzanine, both menus, and the protected copy. The media files are build products and are not committed. `services/origin` is origin A and origin B. `services/ads` is the SSAI stitcher. `services/license` answers Clear Key and holds the published lab key. `apps/web` plays the protected menus with Shaka and clear HLS with hls.js. `apps/android` plays the encrypted DASH menu with Media3. `apps/ios` plays clear HLS with `AVPlayer`. `apps/mobile` plays through Media3 and `AVPlayer`. On the simulator the controls reach 1:00 / 1:00, and the `AVPlayer` view shows the color bars.
 
 ```
 playpath-lab/
